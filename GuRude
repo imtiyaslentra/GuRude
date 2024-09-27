@@ -112,15 +112,14 @@ local VisualToggle = MainTab:CreateToggle({
       visualize_Enabled = state
    end,
 })
--- Memuat Nurysium_Util dari ReplicatedStorage
-local Nurysium_Util = require(game:GetService("ReplicatedStorage"):WaitForChild("Nurysium_Util"))
-
--- Memeriksa apakah Nurysium_Util berhasil dimuat
-if not Nurysium_Util then
-    error("Nurysium_Util not found or not loaded correctly.")
-else
-    print("Nurysium_Util successfully loaded.")
+function someFunction()
+   return "Hasil dari someFunction"
 end
+
+
+local result = someFunction()
+print(result) -- Akan mencetak "Hasil dari someFunction"
+
 local Stats = game:GetService("Stats")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
