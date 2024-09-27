@@ -46,24 +46,61 @@ Rayfield:Notify({
    },
 },
 })
+-- Fungsi Auto Parry
+function AutoParry()
+    while wait(1) do
+        if auto_parry then
+            -- Masukkan logika Auto Parry di sini
+            print("Auto Parry aktif")
+        end
+    end
+end
 
+-- Fungsi AutoSpam
+function AutoSpam()
+    while wait(1) do
+        if auto_spam then
+            -- Masukkan logika Autospam di sini
+            print("Autospam aktif")
+        end
+    end
+end
+
+-- Fungsi Visualize
+function Visualize()
+    while wait(1) do
+        if visualize_Enabled then
+            -- Masukkan logika Visual di sini
+            print("Visualisasi aktif")
+        else
+            print("Visualisasi nonaktif")
+        end
+    end
+end
+
+-- Mulai semua fungsi
+spawn(AutoParry)
+spawn(AutoSpam)
+spawn(Visualize)
+
+-- Toggle untuk Auto Parry
 local Button = MainTab:CreateToggle({
    Name = "Auto Parry",
    CurrentValue = false,
    Flag = "autoparry_toggle",
    Callback = function(state)
       auto_parry = state
-        end,
+   end,
 })
+
 -- Toggle untuk Autospam
 local AutoSpamToggle = MainTab:CreateToggle({
    Name = "Autospam",
    CurrentValue = false,
    Flag = "autospam_toggle",
    Callback = function(state)
-      print("Autospam is " .. (value and "enabled" or "disabled"))
       auto_spam = state
-        end,
+   end,
 })
 
 -- Toggle untuk Visual
@@ -72,7 +109,6 @@ local VisualToggle = MainTab:CreateToggle({
    CurrentValue = false,
    Flag = "visual_toggle",
    Callback = function(state)
-      print("Visual is " .. (value and "enabled" or "disabled"))
       visualize_Enabled = state
    end,
 })
@@ -80,17 +116,10 @@ local VisualToggle = MainTab:CreateToggle({
 local Nurysium_Util = require(game:GetService("ReplicatedStorage"):WaitForChild("Nurysium_Util"))
 
 -- Memeriksa apakah Nurysium_Util berhasil dimuat
-print("Checking Nurysium_Util: ", Nurysium_Util) -- Untuk memastikan tidak nil
-
--- Mendapatkan objek 'ball' menggunakan Nurysium_Util
-local self = Nurysium_Util.getBall() -- Cek ini juga
-
--- Memastikan bahwa 'self' terisi dengan baik
-print("Self ball: ", self) -- Untuk memastikan bahwa self terisi dengan baik
-
--- Menangani kasus di mana 'self' mungkin nil
-if not self then
-    error("Failed to get ball from Nurysium_Util.")
+if not Nurysium_Util then
+    error("Nurysium_Util not found or not loaded correctly.")
+else
+    print("Nurysium_Util successfully loaded.")
 end
 local Stats = game:GetService("Stats")
 local Players = game:GetService("Players")
@@ -118,12 +147,7 @@ local auto_spam = false
 local training_mode = false
 local anti_curve_spam_Enabled = false
 local visualize_Enabled = false
-local hit_sound_Enabled = false
-local hit_effect_Enabled = false
-local night_mode_Enabled = false
-local trail_Enabled = false
-local ball_trial_Enabled = false
-local self_effect_Enabled = false
+AQ_Enabled = false
 local kill_effect_Enabled = false
 local shaders_effect_Enabled = false
 local ai_Enabled = false
