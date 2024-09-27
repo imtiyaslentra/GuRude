@@ -32,7 +32,6 @@ local client_id = RbxAnalyticsService:GetClientId()
 
 local names_map = {
 	['protected'] = crypter.sha3_384(client_id, 'sha3-256'),
-	
 	['Pillow'] = crypter.sha3_384(client_id .. 'Pillow', 'sha3-256'),
 	['Touhou'] = crypter.sha3_384(client_id .. 'Touhou', 'sha3-256'),
 	['Shion'] = crypter.sha3_384(client_id .. 'Shion', 'sha3-256'),
@@ -62,17 +61,24 @@ local RunTime = workspace.Runtime
 local Alive = workspace.Alive
 local Dead = workspace.Dead
 
+-- AutoParry and AutoSpam Setup
 local AutoParry = {
 	ball = nil,
 	target = nil,
-	entity_properties = nil
+	entity_properties = nil,
+	enabled = false
+}
+
+local AutoSpam = {
+	enabled = false
 }
 
 local Player = {
 	Entity = nil,
 
 	properties = {
-		grab_animation = nil
+		grab_animation = nil,
+		parry_animation = nil
 	}
 }
 
@@ -88,4 +94,102 @@ Player.Entity = {
     }
 }
 
-local World = {}
+local World = {
+	entities = {},
+	balls = {}
+}
+
+-- Helper Function to find the nearest ball
+local function getNearestBall()
+	local nearestBall = nil
+	local shortestDistance = math.huge
+	local playerPosition = Player.Entity.properties.position
+	
+	for _, ball in pairs(World.balls) do
+		local ballPosition = ball.Position
+		local distance = (ballPosition - playerPosition).Magnitude
+		if distance < shortestDistance then
+			shortestDistance = distance
+			nearestBall = ball
+		end
+	end
+	return nearestBall
+end
+
+-- Function to toggle AutoParry
+local function toggleAutoParry()
+	AutoParry.enabled = not AutoParry.enabled
+	if AutoParry.enabled then
+		print("Auto Parry Enabled")
+	else
+		print("Auto Parry Disabled")
+	end
+end
+
+-- Function to toggle AutoSpam
+local function toggleAutoSpam()
+	AutoSpam.enabled = not AutoSpam.enabled
+	if AutoSpam.enabled then
+		print("Auto Spam Enabled")
+	else
+		print("Auto Spam Disabled")
+	end
+end
+
+-- UI Buttons to Toggle AutoParry and AutoSpam
+local toggleAutoParryButton = Instance.new("TextButton")
+toggleAutoParryButton.Text = "Toggle Auto Parry"
+toggleAutoParryButton.Position = UDim2.new(0, 50, 0, 100)
+toggleAutoParryButton.Size = UDim2.new(0, 150, 0, 50)
+toggleAutoParryButton.Parent = CoreGui
+
+toggleAutoParryButton.MouseButton1Click:Connect(function()
+	toggleAutoParry()
+end)
+
+local toggleAutoSpamButton = Instance.new("TextButton")
+toggleAutoSpamButton.Text = "Toggle Auto Spam"
+toggleAutoSpamButton.Position = UDim2.new(0, 50, 0, 200)
+toggleAutoSpamButton.Size = UDim2.new(0, 150, 0, 50)
+toggleAutoSpamButton.Parent = CoreGui
+
+toggleAutoSpamButton.MouseButton1Click:Connect(function()
+	toggleAutoSpam()
+end)
+
+-- Main AutoParry Loop
+RunService.Heartbeat:Connect(function()
+	if AutoParry.enabled then
+		AutoParry.ball = getNearestBall() -- Detect nearest ball
+		if AutoParry.ball then
+			local ballDistance = (AutoParry.ball.Position - Player.Entity.properties.position).Magnitude
+			if ballDistance < 20 then -- Adjust range accordingly
+				print("Parrying the ball!")
+				ReplicatedStorage:WaitForChild('ParryEvent'):FireServer(AutoParry.ball)
+			end
+		end
+	end
+end)
+
+-- Main AutoSpam Loop (Example of Spamming a Sword Attack)
+RunService.Heartbeat:Connect(function()
+	if AutoSpam.enabled then
+		print("Spamming sword attack!")
+		ReplicatedStorage:WaitForChild('AttackEvent'):FireServer()
+	end
+end)
+
+-- Function to detect entities (balls and other players) in the game world
+local function updateWorldEntities()
+	World.balls = {} -- Clear balls before updating
+	for _, object in pairs(workspace:GetChildren()) do
+		if object.Name == "Ball" and object:IsA("BasePart") then
+			table.insert(World.balls, object)
+		end
+	end
+end
+
+-- Update world entities regularly
+RunService.Heartbeat:Connect(function()
+	updateWorldEntities()
+end)
