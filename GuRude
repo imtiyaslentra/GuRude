@@ -167,12 +167,14 @@ task.defer(function()
 		end	
 	end)
 end)
+local Players = game:GetService("Players")
+local workspace = game:GetService("Workspace")
+local camera = workspace.CurrentCamera -- Pastikan camera terdefinisi
 
-function getClosestEntityToMouse()
 function getClosestEntityToMouse()
     local closest = nil
     local shortestDistance = math.huge
-    local mouse = game.Players.LocalPlayer:GetMouse()
+    local mouse = Players.LocalPlayer:GetMouse()
 
     -- Pastikan workspace.Alive ada
     if not workspace:FindFirstChild("Alive") then
@@ -198,6 +200,14 @@ function getClosestEntityToMouse()
     end
 
     return closest
+end
+
+-- Contoh penggunaan fungsi
+local closestEntity = getClosestEntityToMouse()
+if closestEntity then
+    print("Closest entity found:", closestEntity.Name)
+else
+    print("No closest entity found.")
 end
 local closest_Entity_To_mouse = nil
 task.defer(function()
