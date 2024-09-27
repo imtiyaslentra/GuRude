@@ -9,7 +9,6 @@ local HttpService = cloneref(game:GetService('HttpService'))
 local RunService = cloneref(game:GetService('RunService'))
 local LogService = cloneref(game:GetService('LogService'))
 local Lighting = cloneref(game:GetService('Lighting'))
-local CoreGui = cloneref(game:GetService('CoreGui'))
 local Players = cloneref(game:GetService('Players'))
 local Debris = cloneref(game:GetService('Debris'))
 local Stats = cloneref(game:GetService('Stats'))
@@ -22,7 +21,7 @@ local crypter = loadstring(game:HttpGet(('https://raw.githubusercontent.com/Egor
 local notify = loadstring(game:HttpGet('https://raw.githubusercontent.com/flezzpe/Nurysium/main/notify_UI.lua'))()
 
 notify.__init({
-    parent = cloneref(game:GetService('CoreGui'))
+	parent = cloneref(game:GetService('CoreGui'))
 })
 
 setfpscap(200)
@@ -31,13 +30,13 @@ local LocalPlayer = Players.LocalPlayer
 local client_id = RbxAnalyticsService:GetClientId()
 
 local names_map = {
-    ['protected'] = crypter.sha3_384(client_id, 'sha3-256'),
-    ['Pillow'] = crypter.sha3_384(client_id .. 'Pillow', 'sha3-256'),
-    ['Touhou'] = crypter.sha3_384(client_id .. 'Touhou', 'sha3-256'),
-    ['Shion'] = crypter.sha3_384(client_id .. 'Shion', 'sha3-256'),
-    ['Miku'] = crypter.sha3_384(client_id .. 'Miku', 'sha3-256'),
-    ['Sino'] = crypter.sha3_384(client_id .. 'Sino', 'sha3-256'),
-    ['Soi'] = crypter.sha3_384(client_id .. 'Soi', 'sha3-256')
+	['protected'] = crypter.sha3_384(client_id, 'sha3-256'),
+	['Pillow'] = crypter.sha3_384(client_id .. 'Pillow', 'sha3-256'),
+	['Touhou'] = crypter.sha3_384(client_id .. 'Touhou', 'sha3-256'),
+	['Shion'] = crypter.sha3_384(client_id .. 'Shion', 'sha3-256'),
+	['Miku'] = crypter.sha3_384(client_id .. 'Miku', 'sha3-256'),
+	['Sino'] = crypter.sha3_384(client_id .. 'Sino', 'sha3-256'),
+	['Soi'] = crypter.sha3_384(client_id .. 'Soi', 'sha3-256')
 }
 
 local interface = loadstring(game:HttpGet('https://raw.githubusercontent.com/flezzpe/EvadeAutoBHOP/main/libs/ef.java'))()
@@ -63,131 +62,141 @@ local Dead = workspace.Dead
 
 -- AutoParry and AutoSpam Setup
 local AutoParry = {
-    ball = nil,
-    target = nil,
-    entity_properties = nil,
-    enabled = false
+	ball = nil,
+	target = nil,
+	entity_properties = nil,
+	enabled = false
 }
 
 local AutoSpam = {
-    enabled = false
+	enabled = false
 }
 
 local Player = {
-    Entity = nil,
+	Entity = nil,
 
-    properties = {
-        grab_animation = nil,
-        parry_animation = nil
-    }
+	properties = {
+		grab_animation = nil,
+		parry_animation = nil
+	}
 }
 
 Player.Entity = {
     properties = {
-        sword = '',
-        server_position = Vector3.zero,
-        velocity = Vector3.zero,
-        position = Vector3.zero,
+		sword = '',
+		server_position = Vector3.zero,
+		velocity = Vector3.zero,
+		position = Vector3.zero,
         is_moving = false,
-        speed = 0,
-        ping = 0
+		speed = 0,
+		ping = 0
     }
 }
 
 local World = {
-    entities = {},
-    balls = {}
+	entities = {},
+	balls = {}
 }
 
 -- Helper Function to find the nearest ball
 local function getNearestBall()
-    local nearestBall = nil
-    local shortestDistance = math.huge
-    local playerPosition = Player.Entity.properties.position
-    
-    for _, ball in pairs(World.balls) do
-        local ballPosition = ball.Position
-        local distance = (ballPosition - playerPosition).Magnitude
-        if distance < shortestDistance then
-            shortestDistance = distance
-            nearestBall = ball
-        end
-    end
-    return nearestBall
+	local nearestBall = nil
+	local shortestDistance = math.huge
+	local playerPosition = Player.Entity.properties.position
+	
+	for _, ball in pairs(World.balls) do
+		local ballPosition = ball.Position
+		local distance = (ballPosition - playerPosition).Magnitude
+		if distance < shortestDistance then
+			shortestDistance = distance
+			nearestBall = ball
+		end
+	end
+	return nearestBall
 end
 
 -- Function to toggle AutoParry
 local function toggleAutoParry()
-    AutoParry.enabled = not AutoParry.enabled
-    if AutoParry.enabled then
-        print("Auto Parry Enabled")
-    else
-        print("Auto Parry Disabled")
-    end
+	AutoParry.enabled = not AutoParry.enabled
+	if AutoParry.enabled then
+		print("Auto Parry Enabled")
+	else
+		print("Auto Parry Disabled")
+	end
 end
 
 -- Function to toggle AutoSpam
 local function toggleAutoSpam()
-    AutoSpam.enabled = not AutoSpam.enabled
-    if AutoSpam.enabled then
-        print("Auto Spam Enabled")
-    else
-        print("Auto Spam Disabled")
-    end
+	AutoSpam.enabled = not AutoSpam.enabled
+	if AutoSpam.enabled then
+		print("Auto Spam Enabled")
+	else
+		print("Auto Spam Disabled")
+	end
 end
 
--- Function to create buttons for GUI
-local function createButton(text, position, callback)
-    local button = Instance.new("TextButton")
-    button.Text = text
-    button.Position = position
-    button.Size = UDim2.new(0, 150, 0, 50)
-    button.Parent = CoreGui  -- Set parent to CoreGui
-    button.BackgroundColor3 = Color3.new(1, 1, 1) -- Set background color
-    button.TextColor3 = Color3.new(0, 0, 0) -- Set text color
-    button.MouseButton1Click:Connect(callback)
-    print(text .. " button created")  -- Debug message
-end
+-- Membuat ScreenGui
+local player = Players.LocalPlayer
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 
--- Menambahkan ini setelah CoreGui siap
-game.Loaded:Wait()  -- Tunggu hingga game benar-benar siap
-print("Creating buttons")
-createButton("Toggle Auto Parry", UDim2.new(0, 50, 0, 100), toggleAutoParry)
-createButton("Toggle Auto Spam", UDim2.new(0, 50, 0, 200), toggleAutoSpam)
+-- Membuat Frame
+local frame = Instance.new("Frame")
+frame.Size = UDim2.new(0, 300, 0, 200) -- Ukuran frame
+frame.Position = UDim2.new(0.5, -150, 0.5, -100) -- Posisi di tengah layar
+frame.BackgroundColor3 = Color3.fromRGB(255, 255, 255) -- Warna latar belakang
+frame.Parent = screenGui -- Menambahkan frame ke ScreenGui
+
+-- Membuat Tombol untuk Toggle AutoParry
+local toggleAutoParryButton = Instance.new("TextButton")
+toggleAutoParryButton.Text = "Toggle Auto Parry"
+toggleAutoParryButton.Size = UDim2.new(0, 150, 0, 50)
+toggleAutoParryButton.Position = UDim2.new(0.5, -75, 0.5, -25) -- Posisi di tengah frame
+toggleAutoParryButton.Parent = frame -- Menambahkan tombol ke frame
+
+-- Tombol untuk Toggle AutoSpam
+local toggleAutoSpamButton = Instance.new("TextButton")
+toggleAutoSpamButton.Text = "Toggle Auto Spam"
+toggleAutoSpamButton.Size = UDim2.new(0, 150, 0, 50)
+toggleAutoSpamButton.Position = UDim2.new(0.5, -75, 0.5, 30) -- Posisi di bawah tombol pertama
+toggleAutoSpamButton.Parent = frame -- Menambahkan tombol ke frame
+
+-- Menghubungkan fungsi ke tombol
+toggleAutoParryButton.MouseButton1Click:Connect(toggleAutoParry)
+toggleAutoSpamButton.MouseButton1Click:Connect(toggleAutoSpam)
 
 -- Main AutoParry Loop
 RunService.Heartbeat:Connect(function()
-    if AutoParry.enabled then
-        AutoParry.ball = getNearestBall() -- Detect nearest ball
-        if AutoParry.ball then
-            local ballDistance = (AutoParry.ball.Position - Player.Entity.properties.position).Magnitude
-            if ballDistance < 20 then -- Adjust range accordingly
-                print("Parrying the ball!")
-                ReplicatedStorage:WaitForChild('ParryEvent'):FireServer(AutoParry.ball)
-            end
-        end
-    end
+	if AutoParry.enabled then
+		AutoParry.ball = getNearestBall() -- Detect nearest ball
+		if AutoParry.ball then
+			local ballDistance = (AutoParry.ball.Position - Player.Entity.properties.position).Magnitude
+			if ballDistance < 20 then -- Adjust range accordingly
+				print("Parrying the ball!")
+				ReplicatedStorage:WaitForChild('ParryEvent'):FireServer(AutoParry.ball)
+			end
+		end
+	end
 end)
 
 -- Main AutoSpam Loop (Example of Spamming a Sword Attack)
 RunService.Heartbeat:Connect(function()
-    if AutoSpam.enabled then
-        print("Spamming sword attack!")
-        ReplicatedStorage:WaitForChild('AttackEvent'):FireServer()
-    end
+	if AutoSpam.enabled then
+		print("Spamming sword attack!")
+		ReplicatedStorage:WaitForChild('AttackEvent'):FireServer()
+	end
 end)
 
 -- Function to detect entities (balls and other players) in the game world
 local function updateWorldEntities()
-    World.balls = {} -- Clear balls before updating
-    for _, object in pairs(workspace:GetChildren()) do
-        if object.Name == "Ball" and object:IsA("BasePart") then
-            table.insert(World.balls, object)
-        end
-    end
+	World.balls = {} -- Clear balls before updating
+	for _, object in pairs(workspace:GetChildren()) do
+		if object.Name == "Ball" and object:IsA("BasePart") then
+			table.insert(World.balls, object)
+		end
+	end
 end
 
 -- Update world entities regularly
 RunService.Heartbeat:Connect(function()
-    updateWorldEntities()
+	updateWorldEntities()
 end)
