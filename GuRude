@@ -47,7 +47,7 @@ Rayfield:Notify({
 },
 })
 
-local Button = MainTab:CreateButton({
+local Button = MainTab:CreateToggle({
    Name = "Auto Parry",
    CurrentValue = false,
    Flag = "autoparry_toggle",
@@ -76,30 +76,6 @@ local VisualToggle = MainTab:CreateToggle({
       visualize_Enabled = state
    end,
 })
-
--- Toggle untuk Check Spam Speed
-local CheckSpamSpeedToggle = MainTab:CreateToggle({
-   Name = "Check Spam Speed",
-   CurrentValue = false,
-   Flag = "spam_speed_toggle",
-   Callback = function(state)
-      print("Check Spam Speed is " .. (value and "enabled" or "disabled"))
-      -- Tambahkan logika untuk Check Spam Speed di sini
-   end,
-})
-
--- Toggle untuk Check FPS
-local CheckFPSToggle = MainTab:CreateToggle({
-   Name = "Check FPS",
-   CurrentValue = false,
-   Flag = "fps_toggle",
-   Callback = function(state)
-      print("Check FPS is " .. (value and "enabled" or "disabled"))
-      -- Tambahkan logika untuk Check FPS di sini
-   end,
-})
--- Functions
-
 local Stats = game:GetService("Stats")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
