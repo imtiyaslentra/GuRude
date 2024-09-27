@@ -76,6 +76,22 @@ local VisualToggle = MainTab:CreateToggle({
       visualize_Enabled = state
    end,
 })
+-- Memuat Nurysium_Util dari ReplicatedStorage
+local Nurysium_Util = require(game:GetService("ReplicatedStorage"):WaitForChild("Nurysium_Util"))
+
+-- Memeriksa apakah Nurysium_Util berhasil dimuat
+print("Checking Nurysium_Util: ", Nurysium_Util) -- Untuk memastikan tidak nil
+
+-- Mendapatkan objek 'ball' menggunakan Nurysium_Util
+local self = Nurysium_Util.getBall() -- Cek ini juga
+
+-- Memastikan bahwa 'self' terisi dengan baik
+print("Self ball: ", self) -- Untuk memastikan bahwa self terisi dengan baik
+
+-- Menangani kasus di mana 'self' mungkin nil
+if not self then
+    error("Failed to get ball from Nurysium_Util.")
+end
 local Stats = game:GetService("Stats")
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
