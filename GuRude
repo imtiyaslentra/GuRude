@@ -143,12 +143,14 @@ local function createButton(text, position, callback)
     button.Position = position
     button.Size = UDim2.new(0, 150, 0, 50)
     button.Parent = CoreGui  -- Set parent to CoreGui
+    button.BackgroundColor3 = Color3.new(1, 1, 1) -- Set background color
+    button.TextColor3 = Color3.new(0, 0, 0) -- Set text color
     button.MouseButton1Click:Connect(callback)
-    return button
+    print(text .. " button created")  -- Debug message
 end
 
 -- Menambahkan ini setelah CoreGui siap
-wait(0.1)  -- Tunggu sejenak agar CoreGui benar-benar siap
+game.Loaded:Wait()  -- Tunggu hingga game benar-benar siap
 print("Creating buttons")
 createButton("Toggle Auto Parry", UDim2.new(0, 50, 0, 100), toggleAutoParry)
 createButton("Toggle Auto Spam", UDim2.new(0, 50, 0, 200), toggleAutoSpam)
