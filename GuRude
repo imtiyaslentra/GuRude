@@ -119,8 +119,10 @@ end
 local function toggleAutoParry()
 	AutoParry.enabled = not AutoParry.enabled
 	if AutoParry.enabled then
+		toggleAutoParryButton.Text = "Auto Parry: ✔️"
 		print("Auto Parry Enabled")
 	else
+		toggleAutoParryButton.Text = "Auto Parry: ❌"
 		print("Auto Parry Disabled")
 	end
 end
@@ -129,8 +131,10 @@ end
 local function toggleAutoSpam()
 	AutoSpam.enabled = not AutoSpam.enabled
 	if AutoSpam.enabled then
+		toggleAutoSpamButton.Text = "Auto Spam: ✔️"
 		print("Auto Spam Enabled")
 	else
+		toggleAutoSpamButton.Text = "Auto Spam: ❌"
 		print("Auto Spam Disabled")
 	end
 end
@@ -148,21 +152,33 @@ frame.Parent = screenGui -- Menambahkan frame ke ScreenGui
 
 -- Membuat Tombol untuk Toggle AutoParry
 local toggleAutoParryButton = Instance.new("TextButton")
-toggleAutoParryButton.Text = "Toggle Auto Parry"
+toggleAutoParryButton.Text = "Auto Parry: ❌"
 toggleAutoParryButton.Size = UDim2.new(0, 150, 0, 50)
 toggleAutoParryButton.Position = UDim2.new(0.5, -75, 0.5, -25) -- Posisi di tengah frame
 toggleAutoParryButton.Parent = frame -- Menambahkan tombol ke frame
 
 -- Tombol untuk Toggle AutoSpam
 local toggleAutoSpamButton = Instance.new("TextButton")
-toggleAutoSpamButton.Text = "Toggle Auto Spam"
+toggleAutoSpamButton.Text = "Auto Spam: ❌"
 toggleAutoSpamButton.Size = UDim2.new(0, 150, 0, 50)
 toggleAutoSpamButton.Position = UDim2.new(0.5, -75, 0.5, 30) -- Posisi di bawah tombol pertama
 toggleAutoSpamButton.Parent = frame -- Menambahkan tombol ke frame
 
+-- Tombol untuk menutup GUI
+local closeButton = Instance.new("TextButton")
+closeButton.Text = "Close"
+closeButton.Size = UDim2.new(0, 150, 0, 50)
+closeButton.Position = UDim2.new(0.5, -75, 0.5, 90) -- Posisi di bawah tombol spam
+closeButton.Parent = frame -- Menambahkan tombol close ke frame
+
 -- Menghubungkan fungsi ke tombol
 toggleAutoParryButton.MouseButton1Click:Connect(toggleAutoParry)
 toggleAutoSpamButton.MouseButton1Click:Connect(toggleAutoSpam)
+
+-- Fungsi untuk menutup GUI
+closeButton.MouseButton1Click:Connect(function()
+	screenGui:Destroy() -- Menghapus GUI dari tampilan
+end)
 
 -- Main AutoParry Loop
 RunService.Heartbeat:Connect(function()
