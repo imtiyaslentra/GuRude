@@ -2,7 +2,7 @@ local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shl
 
 -- Membuat window utama
 local Window = OrionLib:MakeWindow({
-    Name = "Vico Hub (Tester)",
+    Name = "Blade Ball",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "OrionTest",
@@ -18,14 +18,14 @@ end
 -- Notifikasi ketika GUI di-load
 OrionLib:MakeNotification({
     Name = "Execution Started",
-    Content = "Vico Hub successfully loaded!",
+    Content = "GUI successfully loaded!",
     Image = nil,
-    Time = 4
+    Time = 5
 })
 
 -- Tab utama
 local Tab = Window:MakeTab({
-    Name = "Main (Parry)",
+    Name = "Main",
     Icon = "rbxassetid://4483362458",
     PremiumOnly = false
 })
@@ -50,35 +50,32 @@ local lastBallPressed = nil
 local isKeyPressed = false
 local autoParryActive = false -- Status untuk toggle Auto Parry
 local autoSpamActive = false -- Status untuk toggle Auto Spam
-local spamDelay = 0.1 -- Delay antara spam, sesuaikan sesuai kebutuhan
 
--- Fungsi untuk mendapatkan ping pemain
-local function getPlayerPing(player)
-    local success, ping = pcall(function()
-        return player:GetNetworkPing()
-    end)
-    return success and ping or 0
-end
-
--- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan memperhitungkan ping
-local function calculatePredictionTime(ball, player)
+-- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan mempertimbangkan curve
+local function calculateCurvePrediction(ball, player)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local rootPart = player.Character.HumanoidRootPart
         local relativePosition = ball.Position - rootPart.Position
-        local velocity = ball.Velocity + rootPart.Velocity 
+        local velocity = ball.Velocity + rootPart.Velocity
 
-        -- Hitung waktu tabrakan
+        -- Menghitung prediksi dengan mempertimbangkan curve
+        local curveFactor = 0.1 -- Sesuaikan faktor ini untuk dampak curve
+        local predictedPosition = ball.Position + velocity * (1 + curveFactor)
+
         local a = (ball.Size.magnitude / 2) 
-        local b = relativePosition.magnitude
+        local b = (predictedPosition - rootPart.Position).magnitude
         local c = math.sqrt(a * a + b * b)
-        
         local timeToCollision = (c - a) / velocity.magnitude
 
-        -- Sesuaikan dengan ping
-        local pingAdjustment = getPlayerPing(players.LocalPlayer) / 1000 -- Konversi ke detik
-        timeToCollision = timeToCollision + pingAdjustment
-
         return timeToCollision
+    end
+    return math.huge
+end
+
+-- Fungsi untuk menghitung jarak antara pemain dan bola
+local function calculateDistance(ball, player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        return (ball.Position - player.Character.HumanoidRootPart.Position).magnitude
     end
     return math.huge
 end
@@ -92,14 +89,17 @@ end
 local function checkProximityToPlayer(ball, player)
     if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
 
-    local predictionTime = calculatePredictionTime(ball, player)
+    local predictionTime = calculateCurvePrediction(ball, player)
     local realBallAttribute = ball:GetAttribute("realBall")
     local target = ball:GetAttribute("target")
     
-    local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
+    local distanceToBall = calculateDistance(ball, player)
+    
+    -- Mengatur threshold untuk jarak yang lebih dinamis
+    local dynamicDistanceThreshold = distanceToBall < 10 and 5 or distanceToBall * 0.5
 
-    -- Tingkatkan toleransi untuk prediksi
-    if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
+    if distanceToBall < 10 and predictionTime <= dynamicDistanceThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
+        -- Melakukan parry
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
         wait(0.005)
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
@@ -111,19 +111,9 @@ local function checkProximityToPlayer(ball, player)
             Image = nil,
             Time = 3
         })
-    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
+    elseif lastBallPressed == ball and (predictionTime > dynamicDistanceThreshold or realBallAttribute ~= true or target ~= player.Name or distanceToBall >= 10) then
+        -- Reset isKeyPressed jika tidak memenuhi kondisi
         isKeyPressed = false
-    end
-end
-
--- Fungsi untuk melakukan Auto Spam
-local function performAutoSpam()
-    if not autoSpamActive then return end
-
-    while autoSpamActive do
-        vim:SendKeyEvent(true, Enum.KeyCode.Mouse1, false, nil) -- Mengirimkan klik mouse
-        wait(spamDelay) -- Delay sesuai dengan spamDelay
-        vim:SendKeyEvent(false, Enum.KeyCode.Mouse1, false, nil)
     end
 end
 
@@ -137,8 +127,6 @@ local function checkBallsProximity()
         end
     end
 end
-
-runService.Heartbeat:Connect(checkBallsProximity)
 
 -- Fungsi toggle untuk Auto Parry
 local function ToggleAutoParry()
@@ -160,6 +148,26 @@ local function ToggleAutoParry()
     end
 end
 
+-- Tombol Toggle Auto Parry pada tab
+Tab:AddButton({
+    Name = "Toggle Auto Parry",
+    Callback = function()
+        ToggleAutoParry()
+    end
+})
+
+-- Fungsi untuk melakukan Auto Spam
+local function AutoSpam()
+    if not autoSpamActive then return end
+    -- Menggunakan skill spam dengan delay
+    while autoSpamActive do
+        vim:SendKeyEvent(true, Enum.KeyCode.Z, false, nil) -- Ganti dengan tombol yang sesuai
+        wait(0.1) -- Sesuaikan delay spam
+        vim:SendKeyEvent(false, Enum.KeyCode.Z, false, nil)
+        wait(0.1)
+    end
+end
+
 -- Fungsi toggle untuk Auto Spam
 local function ToggleAutoSpam()
     autoSpamActive = not autoSpamActive
@@ -170,7 +178,7 @@ local function ToggleAutoSpam()
             Image = nil,
             Time = 3
         })
-        performAutoSpam() -- Mulai melakukan spam
+        AutoSpam() -- Memulai fungsi Auto Spam
     else
         OrionLib:MakeNotification({
             Name = "Auto Spam Deactivated",
@@ -181,20 +189,34 @@ local function ToggleAutoSpam()
     end
 end
 
--- Tombol Toggle Auto Parry pada tab
-Tab:AddButton({
-    Name = "Auto Parry",
-    Callback = function()
-        ToggleAutoParry()
-    end
-})
-
 -- Tombol Toggle Auto Spam pada tab
 Tab:AddButton({
-    Name = "Auto Spam",
+    Name = "Toggle Auto Spam",
     Callback = function()
         ToggleAutoSpam()
     end
 })
+
+-- Memperbarui fungsi checkBallsProximity untuk memantau pemain yang dekat
+local function checkNearbyPlayers(player)
+    for _, otherPlayer in pairs(players:GetPlayers()) do
+        if otherPlayer ~= player and (otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart")) then
+            local distance = (otherPlayer.Character.HumanoidRootPart.Position - player.Character.HumanoidRootPart.Position).magnitude
+            if distance < 15 then
+                -- Jika ada pemain dekat yang menargetkan kita, siap untuk Auto Spam
+                autoSpamActive = true
+            end
+        end
+    end
+end
+
+-- Menjalankan fungsi checkBallsProximity di Heartbeat
+runService.Heartbeat:Connect(function()
+    checkBallsProximity()
+    local player = players.LocalPlayer
+    if player then
+        checkNearbyPlayers(player) -- Cek pemain dekat
+    end
+end)
 
 print("Script ran without errors")
