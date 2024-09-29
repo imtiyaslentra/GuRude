@@ -10,9 +10,9 @@ local Window = OrionLib:MakeWindow({
 
 -- Memanggil Init pada objek Window
 if Window and type(Window.Init) == "function" then
-    Window:Init() -- Memungkinkan GUI untuk bisa dipindahkan
+    Window:Init()
 else
-    warn("Window Init function is missing!") -- Mengeluarkan peringatan jika Init tidak ada
+    warn("Window Init function is missing!")
 end
 
 -- Notifikasi ketika GUI di-load
@@ -30,114 +30,112 @@ local Tab = Window:MakeTab({
     PremiumOnly = false
 })
 
-local autoParryEnabled = false -- Variabel untuk menandakan status Auto Parry
+-- SERVICES
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local workspace = game:GetService("Workspace")
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local vim = game:GetService("VirtualInputManager")
 
--- Fungsi Auto Parry
-local function AutoParry()
-    local Debug = true -- Aktifkan debug output
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    local Players = game:GetService("Players")
+local ballFolder = workspace.Balls
+local indicatorPart = Instance.new("Part")
+indicatorPart.Size = Vector3.new(5, 5, 5)
+indicatorPart.Anchored = true
+indicatorPart.CanCollide = false
+indicatorPart.Transparency = 1
+indicatorPart.BrickColor = BrickColor.new("Bright red")
+indicatorPart.Parent = workspace
 
-    local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-    local Remotes = ReplicatedStorage:WaitForChild("Remotes", 9e9)
-    local Balls = workspace:WaitForChild("Balls", 9e9)
+local lastBallPressed = nil
+local isKeyPressed = false
+local autoParryActive = false -- Status untuk toggle Auto Parry
 
-    -- Functions
-    local function print(...) -- Debug print.
-        if Debug then
-            warn(...)
+-- Fungsi untuk menghitung waktu prediksi hingga tabrakan
+local function calculatePredictionTime(ball, player)
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = player.Character.HumanoidRootPart
+        local relativePosition = ball.Position - rootPart.Position
+        local velocity = ball.Velocity + rootPart.Velocity 
+        local a = (ball.Size.magnitude / 2) 
+        local b = relativePosition.magnitude
+        local c = math.sqrt(a * a + b * b)
+        local timeToCollision = (c - a) / velocity.magnitude
+        return timeToCollision
+    end
+    return math.huge
+end
+
+-- Fungsi untuk memperbarui posisi indikator
+local function updateIndicatorPosition(ball)
+    indicatorPart.Position = ball.Position
+end
+
+-- Fungsi untuk memeriksa kedekatan bola dengan pemain
+local function checkProximityToPlayer(ball, player)
+    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
+
+    local predictionTime = calculatePredictionTime(ball, player)
+    local realBallAttribute = ball:GetAttribute("realBall")
+    local target = ball:GetAttribute("target")
+    
+    local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
+
+    if predictionTime <= ballSpeedThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
+        vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
+        wait(0.005)
+        vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
+        lastBallPressed = ball
+        isKeyPressed = true
+        OrionLib:MakeNotification({
+            Name = "Parry Executed",
+            Content = "Successfully executed parry!",
+            Image = nil,
+            Time = 3
+        })
+    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
+        isKeyPressed = false
+    end
+end
+
+-- Fungsi untuk memeriksa kedekatan bola
+local function checkBallsProximity()
+    local player = players.LocalPlayer
+    if player then
+        for _, ball in pairs(ballFolder:GetChildren()) do
+            checkProximityToPlayer(ball, player)
+            updateIndicatorPosition(ball)
         end
     end
+end
 
-    local function VerifyBall(Ball) -- Validasi bola
-        return typeof(Ball) == "Instance" and Ball:IsA("BasePart") and Ball:IsDescendantOf(Balls) and Ball:GetAttribute("realBall") == true
+runService.Heartbeat:Connect(checkBallsProximity)
+
+-- Fungsi toggle untuk Auto Parry
+local function ToggleAutoParry()
+    autoParryActive = not autoParryActive
+    if autoParryActive then
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Activated",
+            Content = "Auto Parry is now active!",
+            Image = nil,
+            Time = 3
+        })
+    else
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Deactivated",
+            Content = "Auto Parry has been turned off.",
+            Image = nil,
+            Time = 3
+        })
     end
-
-    local function IsTarget() -- Cek apakah kita target
-        return (Player.Character and Player.Character:FindFirstChild("Highlight"))
-    end
-
-    local function Parry() -- Eksekusi parry
-        if Remotes:FindFirstChild("ParryButtonPress") then
-            Remotes.ParryButtonPress:Fire()
-            print("Parry executed!") -- Output debug jika parry berhasil
-        else
-            print("ParryButtonPress remote not found!") -- Output debug jika remote tidak ditemukan
-        end
-    end
-
-    -- Actual code
-    Balls.ChildAdded:Connect(function(Ball)
-        if not VerifyBall(Ball) then
-            return
-        end
-        
-        print(`Ball Spawned: {Ball}`)
-        
-        local OldPosition = Ball.Position
-        local OldTick = tick()
-        
-        Ball:GetPropertyChangedSignal("Position"):Connect(function()
-            if IsTarget() and autoParryEnabled then -- Jika kita adalah target dan Auto Parry aktif
-                local Distance = (Ball.Position - workspace.CurrentCamera.Focus.Position).Magnitude
-                local Velocity = (OldPosition - Ball.Position).Magnitude
-                
-                print(`Distance: {Distance}\nVelocity: {Velocity}\nTime: {Distance / Velocity}\nParry Condition: {(Distance / Velocity) <= 10}`)
-
-                -- Pastikan kecepatan tidak nol
-                if Velocity > 0 and (Distance / Velocity) <= 10 then
-                    Parry()
-                end
-            end
-            
-            if (tick() - OldTick >= 1/60) then -- Cek pembaruan posisi
-                OldTick = tick()
-                OldPosition = Ball.Position
-            end
-        end)
-    end)
 end
 
 -- Tombol Toggle Auto Parry pada tab
-Tab:AddToggle({
-    Name = "Toggle Auto Parry",
-    Default = false,
-    Callback = function(state)
-        autoParryEnabled = state
-        if state then
-            OrionLib:MakeNotification({
-                Name = "Auto Parry Activated",
-                Content = "Auto Parry is now enabled!",
-                Image = nil,
-                Time = 5
-            })
-            AutoParry() -- Jalankan Auto Parry jika diaktifkan
-        else
-            OrionLib:MakeNotification({
-                Name = "Auto Parry Deactivated",
-                Content = "Auto Parry is now disabled!",
-                Image = nil,
-                Time = 5
-            })
-        end
-    end
-})
-
--- Tambahkan tombol untuk memeriksa ping
 Tab:AddButton({
-    Name = "Check Ping",
+    Name = "Toggle Auto Parry",
     Callback = function()
-        local player = game.Players.LocalPlayer
-        local ping = player:GetNetworkPing()
-
-        OrionLib:MakeNotification({
-            Name = "Ping Status",
-            Content = "Ping: " .. ping .. " ms",
-            Image = nil,
-            Time = 5
-        })
+        ToggleAutoParry()
     end
 })
 
--- Fitur drag GUI
-Window:Init() -- Pastikan GUI dapat dipindahkan
+print("Script ran without errors")
