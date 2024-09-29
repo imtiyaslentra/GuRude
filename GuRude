@@ -127,67 +127,51 @@ local function performAutoSpam()
     end
 end
 
--- Fungsi untuk memeriksa kedekatan bola
+-- Tambahan variabel untuk mengatur keadaan Auto Parry dan Auto Spam berdasarkan kecepatan bola
+local playerFacing = false -- Menandakan apakah pemain menghadap pemain lawan
+local opponentPlayer = nil -- Menyimpan informasi tentang pemain lawan
+
+-- Fungsi untuk memeriksa kedekatan bola dan menentukan tindakan berdasarkan kecepatan
 local function checkBallsProximity()
     local player = players.LocalPlayer
     if player then
         for _, ball in pairs(ballFolder:GetChildren()) do
             checkProximityToPlayer(ball, player)
             updateIndicatorPosition(ball)
-        end
-    end
-end
-
--- Fungsi untuk memeriksa jumlah pemain
-local function checkPlayers()
-    local playerCount = 0
-    local playersInGame = {}
-
-    for _, player in pairs(players:GetPlayers()) do
-        if player ~= players.LocalPlayer then
-            playerCount = playerCount + 1
-            table.insert(playersInGame, player)
-        end
-    end
-
-    return playerCount, playersInGame
-end
-
--- Fungsi untuk mengelola Auto Parry dan Auto Spam
-local function manageAutoFunctions()
-    local player = players.LocalPlayer
-    local playerCount, playersInGame = checkPlayers()
-
-    if playerCount == 1 then -- Hanya ada 2 pemain
-        local opponent = playersInGame[1]
-        local opponentPosition = opponent.Character.HumanoidRootPart.Position
-        local distanceToOpponent = (opponentPosition - player.Character.HumanoidRootPart.Position).magnitude
-        
-        for _, ball in pairs(ballFolder:GetChildren()) do
-            if ball:GetAttribute("realBall") == true then
-                local currentSpeed = ball.Velocity.magnitude
-                
-                if distanceToOpponent < 10 and currentSpeed > 20 then -- Sesuaikan threshold ini
-                    autoSpamActive = true
-                    autoParryActive = false
-                    performAutoSpam() -- Pastikan untuk memulai Auto Spam
-                elseif currentSpeed <= 20 then
-                    autoSpamActive = false
-                    autoParryActive = true
-                    ToggleAutoParry() -- Mengaktifkan Auto Parry
+            
+            local ballSpeed = ball.Velocity.magnitude
+            local playersInProximity = 0
+            
+            -- Memeriksa pemain lain di dekat pemain
+            for _, otherPlayer in pairs(players:GetPlayers()) do
+                if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
+                    local distance = (player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).magnitude
+                    if distance < 15 then -- Jarak dekat yang ditentukan
+                        playersInProximity = playersInProximity + 1
+                        opponentPlayer = otherPlayer
+                    end
+                end
+            end
+            
+            -- Logika untuk mengatur Auto Parry dan Auto Spam
+            if playersInProximity == 1 then
+                playerFacing = true
+                if ballSpeed > 0.5 and not autoSpamActive then
+                    ToggleAutoSpam() -- Aktifkan Auto Spam jika kecepatan bola tinggi
+                elseif ballSpeed <= 0.5 and autoSpamActive then
+                    ToggleAutoSpam() -- Nonaktifkan Auto Spam jika bola melambat
+                end
+            else
+                playerFacing = false
+                if autoSpamActive then
+                    ToggleAutoSpam() -- Nonaktifkan Auto Spam jika ada lebih dari 2 pemain
                 end
             end
         end
-    else
-        autoSpamActive = false
-        autoParryActive = false
     end
 end
 
-runService.Heartbeat:Connect(function()
-    checkBallsProximity()
-    manageAutoFunctions()
-end)
+runService.Heartbeat:Connect(checkBallsProximity)
 
 -- Fungsi toggle untuk Auto Parry
 local function ToggleAutoParry()
