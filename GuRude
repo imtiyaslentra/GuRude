@@ -47,12 +47,17 @@ local function AutoParry()
     end
 
     local function IsTarget() -- Returns true if we are the current target.
-        return (Player.Character and Player.Character:FindFirstChild("Highlight"))
-    end
+    return (Player.Character and Player.Character:FindFirstChild("Highlight"))
+end
 
-    local function Parry() -- Parries.
-        Remotes:WaitForChild("ParryButtonPress"):Fire()
+local function Parry() -- Parries.
+    if Remotes:FindFirstChild("ParryButtonPress") then
+        Remotes.ParryButtonPress:Fire()
+        print("Parry executed!") -- Output debug jika parry berhasil
+    else
+        print("ParryButtonPress remote not found!") -- Output debug jika remote tidak ditemukan
     end
+end
 
     -- The actual code
     Balls.ChildAdded:Connect(function(Ball)
