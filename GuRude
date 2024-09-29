@@ -50,32 +50,35 @@ local lastBallPressed = nil
 local isKeyPressed = false
 local autoParryActive = false -- Status untuk toggle Auto Parry
 local autoSpamActive = false -- Status untuk toggle Auto Spam
+local spamDelay = 0.1 -- Delay antara spam, sesuaikan sesuai kebutuhan
 
--- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan mempertimbangkan curve
-local function calculateCurvePrediction(ball, player)
+-- Fungsi untuk mendapatkan ping pemain
+local function getPlayerPing(player)
+    local success, ping = pcall(function()
+        return player:GetNetworkPing()
+    end)
+    return success and ping or 0
+end
+
+-- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan memperhitungkan ping
+local function calculatePredictionTime(ball, player)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local rootPart = player.Character.HumanoidRootPart
         local relativePosition = ball.Position - rootPart.Position
-        local velocity = ball.Velocity + rootPart.Velocity
+        local velocity = ball.Velocity + rootPart.Velocity 
 
-        -- Menghitung prediksi dengan mempertimbangkan curve
-        local curveFactor = 0.1 -- Sesuaikan faktor ini untuk dampak curve
-        local predictedPosition = ball.Position + velocity * (1 + curveFactor)
-
+        -- Hitung waktu tabrakan
         local a = (ball.Size.magnitude / 2) 
-        local b = (predictedPosition - rootPart.Position).magnitude
+        local b = relativePosition.magnitude
         local c = math.sqrt(a * a + b * b)
+        
         local timeToCollision = (c - a) / velocity.magnitude
 
-        return timeToCollision
-    end
-    return math.huge
-end
+        -- Sesuaikan dengan ping
+        local pingAdjustment = getPlayerPing(players.LocalPlayer) / 1000 -- Konversi ke detik
+        timeToCollision = timeToCollision + pingAdjustment
 
--- Fungsi untuk menghitung jarak antara pemain dan bola
-local function calculateDistance(ball, player)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        return (ball.Position - player.Character.HumanoidRootPart.Position).magnitude
+        return timeToCollision
     end
     return math.huge
 end
@@ -89,18 +92,14 @@ end
 local function checkProximityToPlayer(ball, player)
     if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
 
-    local predictionTime = calculateCurvePrediction(ball, player)
+    local predictionTime = calculatePredictionTime(ball, player)
     local realBallAttribute = ball:GetAttribute("realBall")
     local target = ball:GetAttribute("target")
     
-    local distanceToBall = calculateDistance(ball, player)
-    
-    -- Mengatur threshold untuk jarak yang lebih dinamis
-    local dynamicDistanceThreshold = distanceToBall < 10 and 5 or distanceToBall * 0.5
+    local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
-    -- Jika bola mendekati, lakukan parry
-    if distanceToBall < 10 and predictionTime <= dynamicDistanceThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
-        -- Melakukan parry
+    -- Tingkatkan toleransi untuk prediksi
+    if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
         wait(0.005)
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
@@ -112,9 +111,19 @@ local function checkProximityToPlayer(ball, player)
             Image = nil,
             Time = 3
         })
-    elseif lastBallPressed == ball and (predictionTime > dynamicDistanceThreshold or realBallAttribute ~= true or target ~= player.Name or distanceToBall >= 10) then
-        -- Reset isKeyPressed jika tidak memenuhi kondisi
+    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
         isKeyPressed = false
+    end
+end
+
+-- Fungsi untuk melakukan Auto Spam
+local function performAutoSpam()
+    if not autoSpamActive then return end
+
+    while autoSpamActive do
+        vim:SendKeyEvent(true, Enum.KeyCode.Mouse1, false, nil) -- Mengirimkan klik mouse
+        wait(spamDelay) -- Delay sesuai dengan spamDelay
+        vim:SendKeyEvent(false, Enum.KeyCode.Mouse1, false, nil)
     end
 end
 
@@ -128,6 +137,8 @@ local function checkBallsProximity()
         end
     end
 end
+
+runService.Heartbeat:Connect(checkBallsProximity)
 
 -- Fungsi toggle untuk Auto Parry
 local function ToggleAutoParry()
@@ -149,24 +160,6 @@ local function ToggleAutoParry()
     end
 end
 
--- Tombol Toggle Auto Parry pada tab
-Tab:AddButton({
-    Name = "Toggle Auto Parry",
-    Callback = function()
-        ToggleAutoParry()
-    end
-})
-
--- Fungsi untuk melakukan Auto Spam
-local function AutoSpam()
-    while autoSpamActive do
-        wait(0.1) -- Sesuaikan delay spam
-        vim:SendKeyEvent(true, Enum.KeyCode.Z, false, nil) -- Ganti dengan tombol yang sesuai
-        wait(0.1) -- Delay untuk spam
-        vim:SendKeyEvent(false, Enum.KeyCode.Z, false, nil)
-    end
-end
-
 -- Fungsi toggle untuk Auto Spam
 local function ToggleAutoSpam()
     autoSpamActive = not autoSpamActive
@@ -177,7 +170,7 @@ local function ToggleAutoSpam()
             Image = nil,
             Time = 3
         })
-        AutoSpam() -- Memulai fungsi Auto Spam
+        performAutoSpam() -- Mulai melakukan spam
     else
         OrionLib:MakeNotification({
             Name = "Auto Spam Deactivated",
@@ -188,6 +181,14 @@ local function ToggleAutoSpam()
     end
 end
 
+-- Tombol Toggle Auto Parry pada tab
+Tab:AddButton({
+    Name = "Toggle Auto Parry",
+    Callback = function()
+        ToggleAutoParry()
+    end
+})
+
 -- Tombol Toggle Auto Spam pada tab
 Tab:AddButton({
     Name = "Toggle Auto Spam",
@@ -195,10 +196,5 @@ Tab:AddButton({
         ToggleAutoSpam()
     end
 })
-
--- Menjalankan fungsi checkBallsProximity di Heartbeat
-runService.Heartbeat:Connect(function()
-    checkBallsProximity()
-end)
 
 print("Script ran without errors")
