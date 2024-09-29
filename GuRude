@@ -48,6 +48,9 @@ local isKeyPressed = false
 local autoParryActive = false
 local autoSpamActive = false
 local spamDelay = 0.1
+local lastBallSpeed = 0
+local curveThreshold = 5
+local stopThreshold = 0.1
 
 local function getPlayerPing(player)
     local success, ping = pcall(function()
@@ -67,8 +70,7 @@ local function calculatePredictionTime(ball, player)
         local c = math.sqrt(a * a + b * b)
         
         local timeToCollision = (c - a) / velocity.magnitude
-
-        local pingAdjustment = getPlayerPing(players.LocalPlayer) / 1000
+        local pingAdjustment = getPlayerPing(players.LocalPlayer) / 1000 
         timeToCollision = timeToCollision + pingAdjustment
 
         return timeToCollision
@@ -81,12 +83,12 @@ local function updateIndicatorPosition(ball)
 end
 
 local function checkProximityToPlayer(ball, player)
-    if not autoParryActive then return end
+    if not autoParryActive then return end 
 
     local predictionTime = calculatePredictionTime(ball, player)
     local realBallAttribute = ball:GetAttribute("realBall")
     local target = ball:GetAttribute("target")
-    
+
     local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
     if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
@@ -119,37 +121,52 @@ end
 local playerFacing = false
 local opponentPlayer = nil
 
+local function isBallCurving(ball)
+    local currentSpeed = ball.Velocity.magnitude
+    local directionChange = (currentSpeed - lastBallSpeed) / lastBallSpeed
+    lastBallSpeed = currentSpeed
+
+    return directionChange > curveThreshold
+end
+
 local function checkBallsProximity()
     local player = players.LocalPlayer
     if player then
         for _, ball in pairs(ballFolder:GetChildren()) do
             checkProximityToPlayer(ball, player)
             updateIndicatorPosition(ball)
-            
+
             local ballSpeed = ball.Velocity.magnitude
             local playersInProximity = 0
-            
+
             for _, otherPlayer in pairs(players:GetPlayers()) do
                 if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     local distance = (player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).magnitude
-                    if distance < 15 then
+                    if distance < 15 then 
                         playersInProximity = playersInProximity + 1
                         opponentPlayer = otherPlayer
                     end
                 end
             end
-            
+
             if playersInProximity == 1 then
-                playerFacing = true
-                if ballSpeed > 0.5 and not autoSpamActive then
-                    ToggleAutoSpam() 
-                elseif ballSpeed <= 0.5 and autoSpamActive then
-                    ToggleAutoSpam() 
+                if isBallCurving(ball) then
+                    ToggleAutoParry() 
+                elseif ballSpeed < stopThreshold then
+                    -- Jika bola berhenti
+                    if autoParryActive then
+                        ToggleAutoParry() -- Nonaktifkan Auto Parry jika bola berhenti
+                    end
+                else
+                    if ballSpeed > 0.5 and not autoSpamActive then
+                        ToggleAutoSpam()
+                    elseif ballSpeed <= 0.5 and autoSpamActive then
+                        ToggleAutoSpam()
+                    end
                 end
             else
-                playerFacing = false
                 if autoSpamActive then
-                    ToggleAutoSpam() 
+                    ToggleAutoSpam()
                 end
             end
         end
@@ -160,24 +177,40 @@ runService.Heartbeat:Connect(checkBallsProximity)
 
 local function ToggleAutoParry()
     autoParryActive = not autoParryActive
-    OrionLib:MakeNotification({
-        Name = autoParryActive and "Auto Parry Activated" or "Auto Parry Deactivated",
-        Content = autoParryActive and "Auto Parry is now active!" or "Auto Parry has been turned off.",
-        Image = nil,
-        Time = 3
-    })
+    if autoParryActive then
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Activated",
+            Content = "Auto Parry is now active!",
+            Image = nil,
+            Time = 3
+        })
+    else
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Deactivated",
+            Content = "Auto Parry has been turned off.",
+            Image = nil,
+            Time = 3
+        })
+    end
 end
 
 local function ToggleAutoSpam()
     autoSpamActive = not autoSpamActive
-    OrionLib:MakeNotification({
-        Name = autoSpamActive and "Auto Spam Activated" or "Auto Spam Deactivated",
-        Content = autoSpamActive and "Auto Spam is now active!" or "Auto Spam has been turned off.",
-        Image = nil,
-        Time = 3
-    })
     if autoSpamActive then
-        performAutoSpam() 
+        OrionLib:MakeNotification({
+            Name = "Auto Spam Activated",
+            Content = "Auto Spam is now active!",
+            Image = nil,
+            Time = 3
+        })
+        performAutoSpam()
+    else
+        OrionLib:MakeNotification({
+            Name = "Auto Spam Deactivated",
+            Content = "Auto Spam has been turned off.",
+            Image = nil,
+            Time = 3
+        })
     end
 end
 
