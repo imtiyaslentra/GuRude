@@ -60,17 +60,6 @@ local function getPlayerPing(player)
     return success and ping or 0
 end
 
--- Fungsi untuk menghitung rata-rata ping yang stabil
-local function calculateAdjustedPing()
-    local totalPing = 0
-    local numSamples = 5 -- Mengambil beberapa sampel untuk mendapatkan rata-rata
-    for i = 1, numSamples do
-        totalPing = totalPing + getPlayerPing(players.LocalPlayer)
-        wait(0.1) -- Delay sedikit antara pengukuran
-    end
-    return totalPing / numSamples -- Mengembalikan rata-rata ping
-end
-
 -- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan memperhitungkan ping
 local function calculatePredictionTime(ball, player)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
@@ -101,25 +90,22 @@ end
 
 -- Fungsi untuk memeriksa kedekatan bola dengan pemain
 local function checkProximityToPlayer(ball, player)
-    if not autoParryActive then return end
+    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
 
-    local predictionTime = calculatePredictionTime(ball, player)
+    local predictionTime = calculatePredictionTime(ball, player) -- Hitung waktu prediksi
     local realBallAttribute = ball:GetAttribute("realBall")
     local target = ball:GetAttribute("target")
     
-    -- Menambahkan penghitungan jarak bola ke pemain
-    local distanceToPlayer = (ball.Position - player.Character.HumanoidRootPart.Position).magnitude
-    local pingAdjustment = calculateAdjustedPing() / 1000 -- Menggunakan rata-rata ping yang lebih stabil
-    local adjustedPredictionTime = predictionTime + pingAdjustment
-
-    -- Menggunakan threshold jarak untuk menyesuaikan tindakan
-    local distanceThreshold = 10 -- Threshold jarak dalam unit permainan
+    -- Dapatkan jarak dan hitung toleransi
+    local playerPosition = player.Character.HumanoidRootPart.Position
+    local ballPosition = ball.Position
+    local distance = (ballPosition - playerPosition).magnitude
     local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
-    -- Memperbaiki logika prediksi
-    if adjustedPredictionTime <= ballSpeedThreshold + 0.1 and 
-       realBallAttribute == true and target == player.Name and 
-       not isKeyPressed and distanceToPlayer < distanceThreshold then
+    print("Prediction Time:", predictionTime) -- Debugging
+    print("Ball Speed Threshold:", ballSpeedThreshold) -- Debugging
+
+    if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
         wait(0.005)
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
@@ -131,9 +117,7 @@ local function checkProximityToPlayer(ball, player)
             Image = nil,
             Time = 3
         })
-    elseif lastBallPressed == ball and 
-           (adjustedPredictionTime > ballSpeedThreshold or 
-           realBallAttribute ~= true or target ~= player.Name) then
+    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
         isKeyPressed = false
     end
 end
@@ -149,25 +133,22 @@ local function performAutoSpam()
     end
 end
 
--- Tambahan variabel untuk mengatur keadaan Auto Parry dan Auto Spam berdasarkan kecepatan bola
-local playerFacing = false -- Menandakan apakah pemain menghadap pemain lawan
-local opponentPlayer = nil -- Menyimpan informasi tentang pemain lawan
-
--- Memperbarui fungsi untuk mengecek jarak antara bola dan pemain
+-- Fungsi untuk memeriksa kedekatan bola dan menentukan tindakan berdasarkan kecepatan
 local function checkBallsProximity()
     local player = players.LocalPlayer
     if player then
         for _, ball in pairs(ballFolder:GetChildren()) do
-            checkProximityToPlayer(ball, player)
+            checkProximityToPlayer(ball, player) -- Pastikan ini ada
             updateIndicatorPosition(ball)
-
+            
             local ballSpeed = ball.Velocity.magnitude
             local playersInProximity = 0
             
+            -- Memeriksa pemain lain di dekat pemain
             for _, otherPlayer in pairs(players:GetPlayers()) do
                 if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
                     local distance = (player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).magnitude
-                    if distance < 15 then
+                    if distance < 15 then -- Jarak dekat yang ditentukan
                         playersInProximity = playersInProximity + 1
                     end
                 end
@@ -176,13 +157,13 @@ local function checkBallsProximity()
             -- Logika untuk mengatur Auto Parry dan Auto Spam
             if playersInProximity == 1 then
                 if ballSpeed > 0.5 and not autoSpamActive then
-                    ToggleAutoSpam() 
+                    ToggleAutoSpam() -- Aktifkan Auto Spam jika kecepatan bola tinggi
                 elseif ballSpeed <= 0.5 and autoSpamActive then
-                    ToggleAutoSpam() 
+                    ToggleAutoSpam() -- Nonaktifkan Auto Spam jika bola melambat
                 end
             else
                 if autoSpamActive then
-                    ToggleAutoSpam()
+                    ToggleAutoSpam() -- Nonaktifkan Auto Spam jika ada lebih dari 2 pemain
                 end
             end
         end
@@ -234,7 +215,7 @@ end
 
 -- Tombol Toggle Auto Parry pada tab
 Tab:AddButton({
-        Name = "Toggle Auto Parry",
+    Name = "Toggle Auto Parry",
     Callback = function()
         ToggleAutoParry()
     end
@@ -262,4 +243,5 @@ Tab:AddSlider({
 
 -- Mengatur UI
 OrionLib:Init()
-   
+
+print("Script ran without errors")
