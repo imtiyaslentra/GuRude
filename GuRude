@@ -1,158 +1,113 @@
-local Rayfield = loadstring(game:HttpGet('https://sirius.menu/rayfield'))()
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
 
-local Window = Rayfield:CreateWindow({
-   Name = "Blade Ball",
-   LoadingTitle = "Xerolyx fake",
-   LoadingSubtitle = "by Kaizn",
-   ConfigurationSaving = {
-      Enabled = false,
-      FolderName = nil, -- Create a custom folder for your hub/game
-      FileName = "Nigga"
-   },
-   Discord = {
-      Enabled = false,
-      Invite = "noinvitelink", -- The Discord invite code, do not include discord.gg/. E.g. discord.gg/ABCD would be ABCD
-      RememberJoins = true -- Set this to false to make them join the discord every time they load it up
-   },
-   KeySystem = false, -- Set this to true to use our key system
-   KeySettings = {
-      Title = "Untitled",
-      Subtitle = "Key System",
-      Note = "Key is not needed",
-      FileName = "Key", -- It is recommended to use something unique as other scripts using Rayfield may overwrite your key file
-      SaveKey = true, -- The user's key will be saved, but if you change the key, they will be unable to use your script
-      GrabKeyFromSite = false, -- If this is true, set Key below to the RAW site you would like Rayfield to get the key from
-      Key = {"Hello"} -- List of keys that will be accepted by the system, can be RAW file links (pastebin, github etc) or simple strings ("hello","key22")
-   }
+-- Membuat window utama
+local Window = OrionLib:MakeWindow({
+    Name = "Blade Ball",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "OrionTest",
 })
 
-local MainTab = Window:CreateTab("Home", 4483362458) -- Title, Image
-local MainSection = MainTab:CreateSection("Main")
-
-Rayfield:Notify({
-   Title = "Excution Started",
-   Content = "Notification Content",
-   Duration = 5,
-   Image = nil,
-   Actions = { -- Notification Buttons
-      Ignore = {
-         Name = "Okay!",
-         Callback = function()
-         print("The user tapped Okay!")
-      end
-   },
-},
+-- Notifikasi ketika GUI di-load
+OrionLib:MakeNotification({
+    Name = "Execution Started",
+    Content = "GUI successfully loaded!",
+    Image = nil,
+    Time = 5
 })
 
-local Button = MainTab:CreateButton({
-   Name = "Auto Parry",
-   Callback = function()
-  local Debug = false -- Set this to true if you want my debug output.
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Players = game:GetService("Players")
+-- Tab utama
+local Tab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483362458",
+    PremiumOnly = false
+})
 
-local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
-local Remotes = ReplicatedStorage:WaitForChild("Remotes", 9e9) -- A second argument in waitforchild what could it mean?
-local Balls = workspace:WaitForChild("Balls", 9e9)
+-- Fungsi Auto Parry
+local function AutoParry()
+    local Debug = false -- Set this to true if you want my debug output.
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
+    local Players = game:GetService("Players")
 
--- Functions
+    local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+    local Remotes = ReplicatedStorage:WaitForChild("Remotes", 9e9) -- A second argument in waitforchild what could it mean?
+    local Balls = workspace:WaitForChild("Balls", 9e9)
 
-local function print(...) -- Debug print.
-    if Debug then
-        warn(...)
+    -- Functions
+    local function print(...) -- Debug print.
+        if Debug then
+            warn(...)
+        end
     end
-end
 
-local function VerifyBall(Ball) -- Returns nil if the ball isn't a valid projectile; true if it's the right ball.
-    if typeof(Ball) == "Instance" and Ball:IsA("BasePart") and Ball:IsDescendantOf(Balls) and Ball:GetAttribute("realBall") == true then
-        return true
+    local function VerifyBall(Ball) -- Returns nil if the ball isn't a valid projectile; true if it's the right ball.
+        if typeof(Ball) == "Instance" and Ball:IsA("BasePart") and Ball:IsDescendantOf(Balls) and Ball:GetAttribute("realBall") == true then
+            return true
+        end
     end
-end
 
-local function IsTarget() -- Returns true if we are the current target.
-    return (Player.Character and Player.Character:FindFirstChild("Highlight"))
-end
-
-local function Parry() -- Parries.
-    Remotes:WaitForChild("ParryButtonPress"):Fire()
-end
-
--- The actual code
-
-Balls.ChildAdded:Connect(function(Ball)
-    if not VerifyBall(Ball) then
-        return
+    local function IsTarget() -- Returns true if we are the current target.
+        return (Player.Character and Player.Character:FindFirstChild("Highlight"))
     end
-    
-    print(`Ball Spawned: {Ball}`)
-    
-    local OldPosition = Ball.Position
-    local OldTick = tick()
-    
-    Ball:GetPropertyChangedSignal("Position"):Connect(function()
-        if IsTarget() then -- No need to do the math if we're not being attacked.
-            local Distance = (Ball.Position - workspace.CurrentCamera.Focus.Position).Magnitude
-            local Velocity = (OldPosition - Ball.Position).Magnitude -- Fix for .Velocity not working. Yes I got the lowest possible grade in accuplacer math.
+
+    local function Parry() -- Parries.
+        Remotes:WaitForChild("ParryButtonPress"):Fire()
+    end
+
+    -- The actual code
+    Balls.ChildAdded:Connect(function(Ball)
+        if not VerifyBall(Ball) then
+            return
+        end
+        
+        print(`Ball Spawned: {Ball}`)
+        
+        local OldPosition = Ball.Position
+        local OldTick = tick()
+        
+        Ball:GetPropertyChangedSignal("Position"):Connect(function()
+            if IsTarget() then -- No need to do the math if we're not being attacked.
+                local Distance = (Ball.Position - workspace.CurrentCamera.Focus.Position).Magnitude
+                local Velocity = (OldPosition - Ball.Position).Magnitude -- Fix for .Velocity not working. Yes I got the lowest possible grade in accuplacer math.
+                
+                print(`Distance: {Distance}\nVelocity: {Velocity}\nTime: {Distance / Velocity}`)
             
-            print(`Distance: {Distance}\nVelocity: {Velocity}\nTime: {Distance / Velocity}`)
-        
-            if (Distance / Velocity) <= 10 then -- Sorry for the magic number. This just works. No, you don't get a slider for this because it's 2am.
-                Parry()
-            end
-        end
-        
-        if (tick() - OldTick >= 1/60) then -- Don't want it to update too quickly because my velocity implementation is aids. Yes, I tried Ball.Velocity. No, it didn't work.
-            OldTick = tick()
-            OldPosition = Ball.Position
-        end
-    end)
-end)
-   end,
-})
-
--- Menambahkan fungsi drag-and-drop
-local function makeGuiDraggable(guiElement)
-    local dragging
-    local dragInput
-    local dragStart
-    local startPos
-
-    local function update(input)
-        local delta = input.Position - dragStart
-        guiElement.Position = UDim2.new(
-            startPos.X.Scale, startPos.X.Offset + delta.X,
-            startPos.Y.Scale, startPos.Y.Offset + delta.Y
-        )
-    end
-
-    guiElement.InputBegan:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseButton1 then
-            dragging = true
-            dragStart = input.Position
-            startPos = guiElement.Position
-
-            input.Changed:Connect(function()
-                if input.UserInputState == Enum.UserInputState.End then
-                    dragging = false
+                if (Distance / Velocity) <= 10 then -- Sorry for the magic number. This just works. No, you don't get a slider for this because it's 2am.
+                    Parry()
                 end
-            end)
-        end
-    end)
-
-    guiElement.InputChanged:Connect(function(input)
-        if input.UserInputType == Enum.UserInputType.MouseMovement then
-            dragInput = input
-        end
-    end)
-
-    game:GetService("UserInputService").InputChanged:Connect(function(input)
-        if input == dragInput and dragging then
-            update(input)
-        end
+            end
+            
+            if (tick() - OldTick >= 1/60) then -- Don't want it to update too quickly because my velocity implementation is aids. Yes, I tried Ball.Velocity. No, it didn't work.
+                OldTick = tick()
+                OldPosition = Ball.Position
+            end
+        end)
     end)
 end
 
--- Kurangi ukuran GUI agar lebih kecil
-local MainFrame = Window.Frame -- Asumsi GUI ada di frame utama
-MainFrame.Size = UDim2.new(0.3, 0, 0.4, 0) -- Ukuran GUI lebih kecil
-makeGuiDraggable(MainFrame) -- Buat GUI dapat di-drag
+-- Tombol Auto Parry pada tab
+Tab:AddButton({
+    Name = "Auto Parry",
+    Callback = function()
+        AutoParry()
+    end
+})
+
+-- Tambahkan tombol untuk memeriksa ping
+Tab:AddButton({
+    Name = "Check Ping",
+    Callback = function()
+        local player = game.Players.LocalPlayer
+        local ping = player:GetNetworkPing()
+
+        OrionLib:MakeNotification({
+            Name = "Ping Status",
+            Content = "Ping: " .. ping .. " ms",
+            Image = nil,
+            Time = 5
+        })
+    end
+})
+
+-- Fitur drag GUI
+Window:Init() -- Memungkinkan GUI untuk bisa dipindahkan
