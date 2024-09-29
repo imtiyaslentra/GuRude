@@ -37,7 +37,7 @@ local players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local vim = game:GetService("VirtualInputManager")
 
-local ballFolder = workspace:WaitForChild("Balls")
+local ballFolder = workspace.Balls
 local indicatorPart = Instance.new("Part")
 indicatorPart.Size = Vector3.new(5, 5, 5)
 indicatorPart.Anchored = true
@@ -50,18 +50,34 @@ local lastBallPressed = nil
 local isKeyPressed = false
 local autoParryActive = false -- Status untuk toggle Auto Parry
 local autoSpamActive = false -- Status untuk toggle Auto Spam
-local spamKey = Enum.KeyCode.F -- Tombol untuk auto spam
+local spamDelay = 0.1 -- Delay antara spam, sesuaikan sesuai kebutuhan
 
--- Fungsi untuk menghitung waktu prediksi hingga tabrakan
+-- Fungsi untuk mendapatkan ping pemain
+local function getPlayerPing(player)
+    local success, ping = pcall(function()
+        return player:GetNetworkPing()
+    end)
+    return success and ping or 0
+end
+
+-- Fungsi untuk menghitung waktu prediksi hingga tabrakan dengan memperhitungkan ping
 local function calculatePredictionTime(ball, player)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local rootPart = player.Character.HumanoidRootPart
         local relativePosition = ball.Position - rootPart.Position
         local velocity = ball.Velocity + rootPart.Velocity 
+
+        -- Hitung waktu tabrakan
         local a = (ball.Size.magnitude / 2) 
         local b = relativePosition.magnitude
         local c = math.sqrt(a * a + b * b)
+        
         local timeToCollision = (c - a) / velocity.magnitude
+
+        -- Sesuaikan dengan ping
+        local pingAdjustment = getPlayerPing(players.LocalPlayer) / 1000 -- Konversi ke detik
+        timeToCollision = timeToCollision + pingAdjustment
+
         return timeToCollision
     end
     return math.huge
@@ -82,7 +98,8 @@ local function checkProximityToPlayer(ball, player)
     
     local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
-    if predictionTime <= ballSpeedThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
+    -- Tingkatkan toleransi untuk prediksi
+    if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
         wait(0.005)
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
@@ -96,6 +113,17 @@ local function checkProximityToPlayer(ball, player)
         })
     elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
         isKeyPressed = false
+    end
+end
+
+-- Fungsi untuk melakukan Auto Spam
+local function performAutoSpam()
+    if not autoSpamActive then return end
+
+    while autoSpamActive do
+        vim:SendKeyEvent(true, Enum.KeyCode.Mouse1, false, nil) -- Mengirimkan klik mouse
+        wait(spamDelay) -- Delay sesuai dengan spamDelay
+        vim:SendKeyEvent(false, Enum.KeyCode.Mouse1, false, nil)
     end
 end
 
@@ -142,22 +170,7 @@ local function ToggleAutoSpam()
             Image = nil,
             Time = 3
         })
-        -- Mulai loop auto spam
-        spawn(function()
-            while autoSpamActive do
-                local player = players.LocalPlayer
-                for _, ball in pairs(ballFolder:GetChildren()) do
-                    if isBallTarget(ball) and canParry(ball) then
-                        vim:SendKeyEvent(true, spamKey, false, nil)
-                        wait(0.1) -- Jeda spam
-                        vim:SendKeyEvent(false, spamKey, false, nil)
-                        print("Auto Spam executed!")
-                        break
-                    end
-                end
-                wait(0.1) -- Jeda antara pemeriksaan spam
-            end
-        end)
+        performAutoSpam() -- Mulai melakukan spam
     else
         OrionLib:MakeNotification({
             Name = "Auto Spam Deactivated",
