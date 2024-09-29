@@ -138,7 +138,56 @@ local function checkBallsProximity()
     end
 end
 
-runService.Heartbeat:Connect(checkBallsProximity)
+-- Fungsi untuk memeriksa jumlah pemain
+local function checkPlayers()
+    local playerCount = 0
+    local playersInGame = {}
+
+    for _, player in pairs(players:GetPlayers()) do
+        if player ~= players.LocalPlayer then
+            playerCount = playerCount + 1
+            table.insert(playersInGame, player)
+        end
+    end
+
+    return playerCount, playersInGame
+end
+
+-- Fungsi untuk mengelola Auto Parry dan Auto Spam
+local function manageAutoFunctions()
+    local player = players.LocalPlayer
+    local playerCount, playersInGame = checkPlayers()
+
+    if playerCount == 1 then -- Hanya ada 2 pemain
+        local opponent = playersInGame[1]
+        local opponentPosition = opponent.Character.HumanoidRootPart.Position
+        local distanceToOpponent = (opponentPosition - player.Character.HumanoidRootPart.Position).magnitude
+        
+        for _, ball in pairs(ballFolder:GetChildren()) do
+            if ball:GetAttribute("realBall") == true then
+                local currentSpeed = ball.Velocity.magnitude
+                
+                if distanceToOpponent < 10 and currentSpeed > 20 then -- Sesuaikan threshold ini
+                    autoSpamActive = true
+                    autoParryActive = false
+                    performAutoSpam() -- Pastikan untuk memulai Auto Spam
+                elseif currentSpeed <= 20 then
+                    autoSpamActive = false
+                    autoParryActive = true
+                    ToggleAutoParry() -- Mengaktifkan Auto Parry
+                end
+            end
+        end
+    else
+        autoSpamActive = false
+        autoParryActive = false
+    end
+end
+
+runService.Heartbeat:Connect(function()
+    checkBallsProximity()
+    manageAutoFunctions()
+end)
 
 -- Fungsi toggle untuk Auto Parry
 local function ToggleAutoParry()
