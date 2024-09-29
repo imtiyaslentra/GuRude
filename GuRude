@@ -36,6 +36,10 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local VirtualInputManager = game:GetService("VirtualInputManager")
 
+-- Orion Library Initialization
+local OrionLib = loadstring(game:HttpGet('https://raw.githubusercontent.com/shlexware/Orion/main/source'))()
+local Window = OrionLib:MakeWindow({Name = "Game Controls", HidePremium = true})
+
 -- VARIABLES
 local player = Players.LocalPlayer
 local ballFolder = workspace:WaitForChild("Balls")
@@ -100,35 +104,39 @@ local function autoSpam()
     end
 end
 
--- Toggle Auto Parry dan Auto Spam
-local function toggleAutoParry()
-    isAutoParryActive = not isAutoParryActive
-    if isAutoParryActive then
-        print("Auto Parry activated.")
-        autoParry()
-    else
-        print("Auto Parry deactivated.")
-    end
-end
+-- UI Setup
+local Tab = Window:MakeTab({
+    Name = "Auto Controls",
+    Icon = "rbxassetid://6035031244", -- Ganti dengan asset ID yang sesuai
+    Premium = false,
+})
 
-local function toggleAutoSpam()
-    isAutoSpamActive = not isAutoSpamActive
-    if isAutoSpamActive then
-        print("Auto Spam activated.")
-        autoSpam()
-    else
-        print("Auto Spam deactivated.")
+Tab:AddToggle({
+    Name = "Auto Parry",
+    Default = false,
+    Callback = function(Value)
+        isAutoParryActive = Value
+        if Value then
+            print("Auto Parry activated.")
+            autoParry()
+        else
+            print("Auto Parry deactivated.")
+        end
     end
-end
+})
 
--- Menghubungkan tombol untuk mengaktifkan atau menonaktifkan auto parry dan auto spam
-local UserInputService = game:GetService("UserInputService")
-UserInputService.InputBegan:Connect(function(input, gameProcessed)
-    if input.KeyCode == Enum.KeyCode.P then -- Ganti dengan tombol yang diinginkan untuk parry
-        toggleAutoParry()
-    elseif input.KeyCode == Enum.KeyCode.S then -- Ganti dengan tombol yang diinginkan untuk spam
-        toggleAutoSpam()
+Tab:AddToggle({
+    Name = "Auto Spam",
+    Default = false,
+    Callback = function(Value)
+        isAutoSpamActive = Value
+        if Value then
+            print("Auto Spam activated.")
+            autoSpam()
+        else
+            print("Auto Spam deactivated.")
+        end
     end
-end)
+})
 
 print("Auto Parry and Auto Spam scripts loaded successfully.")
