@@ -2,7 +2,7 @@ local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shl
 
 -- Membuat window utama
 local Window = OrionLib:MakeWindow({
-    Name = "Vico Hub",
+    Name = "Blade Ball",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "OrionTest",
@@ -30,25 +30,16 @@ local Tab = Window:MakeTab({
     PremiumOnly = false
 })
 
--- Mendapatkan Remote Event Parry
-local function resolve_parry_Remote()
-    local ReplicatedStorage = game:GetService("ReplicatedStorage")
-    for _, value in pairs(ReplicatedStorage:GetChildren()) do
-        local temp_remote = value:FindFirstChildOfClass('RemoteEvent')
-        if temp_remote and not temp_remote.Name:find('\n') then
-            return temp_remote
-        end
-    end
-    return nil
-end
-
-local originalParryRemote = resolve_parry_Remote()
+local autoParryEnabled = false -- Variabel untuk menandakan status Auto Parry
 
 -- Fungsi Auto Parry
 local function AutoParry()
     local Debug = true -- Aktifkan debug output
+    local ReplicatedStorage = game:GetService("ReplicatedStorage")
     local Players = game:GetService("Players")
+
     local Player = Players.LocalPlayer or Players.PlayerAdded:Wait()
+    local Remotes = ReplicatedStorage:WaitForChild("Remotes", 9e9)
     local Balls = workspace:WaitForChild("Balls", 9e9)
 
     -- Functions
@@ -67,11 +58,11 @@ local function AutoParry()
     end
 
     local function Parry() -- Eksekusi parry
-        if originalParryRemote then
-            originalParryRemote:FireServer()
+        if Remotes:FindFirstChild("ParryButtonPress") then
+            Remotes.ParryButtonPress:Fire()
             print("Parry executed!") -- Output debug jika parry berhasil
         else
-            print("Parry remote not found!") -- Output debug jika remote tidak ditemukan
+            print("ParryButtonPress remote not found!") -- Output debug jika remote tidak ditemukan
         end
     end
 
@@ -87,7 +78,7 @@ local function AutoParry()
         local OldTick = tick()
         
         Ball:GetPropertyChangedSignal("Position"):Connect(function()
-            if IsTarget() then -- Jika kita adalah target
+            if IsTarget() and autoParryEnabled then -- Jika kita adalah target dan Auto Parry aktif
                 local Distance = (Ball.Position - workspace.CurrentCamera.Focus.Position).Magnitude
                 local Velocity = (OldPosition - Ball.Position).Magnitude
                 
@@ -107,17 +98,34 @@ local function AutoParry()
     end)
 end
 
--- Tombol Auto Parry pada tab
-Tab:AddButton({
-    Name = "Auto Parry (Op)",
-    Callback = function()
-        AutoParry()
+-- Tombol Toggle Auto Parry pada tab
+Tab:AddToggle({
+    Name = "Toggle Auto Parry",
+    Default = false,
+    Callback = function(state)
+        autoParryEnabled = state
+        if state then
+            OrionLib:MakeNotification({
+                Name = "Auto Parry Activated",
+                Content = "Auto Parry is now enabled!",
+                Image = nil,
+                Time = 5
+            })
+            AutoParry() -- Jalankan Auto Parry jika diaktifkan
+        else
+            OrionLib:MakeNotification({
+                Name = "Auto Parry Deactivated",
+                Content = "Auto Parry is now disabled!",
+                Image = nil,
+                Time = 5
+            })
+        end
     end
 })
 
 -- Tambahkan tombol untuk memeriksa ping
 Tab:AddButton({
-    Name = "Check Ping (Ms)",
+    Name = "Check Ping",
     Callback = function()
         local player = game.Players.LocalPlayer
         local ping = player:GetNetworkPing()
@@ -133,13 +141,3 @@ Tab:AddButton({
 
 -- Fitur drag GUI
 Window:Init() -- Pastikan GUI dapat dipindahkan
-
--- Event saat parry berhasil
-originalParryRemote.OnClientEvent:Connect(function()
-    -- Tambahkan efek suara atau efek lainnya di sini
-end)
-
--- Event untuk mengatur ulang data ketika bola dihapus
-workspace:WaitForChild("Balls").ChildRemoved:Connect(function(child)
-    -- Reset data atau logika lain saat bola dihapus
-end)
