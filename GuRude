@@ -109,3 +109,50 @@ Balls.ChildAdded:Connect(function(Ball)
 end)
    end,
 })
+
+-- Menambahkan fungsi drag-and-drop
+local function makeGuiDraggable(guiElement)
+    local dragging
+    local dragInput
+    local dragStart
+    local startPos
+
+    local function update(input)
+        local delta = input.Position - dragStart
+        guiElement.Position = UDim2.new(
+            startPos.X.Scale, startPos.X.Offset + delta.X,
+            startPos.Y.Scale, startPos.Y.Offset + delta.Y
+        )
+    end
+
+    guiElement.InputBegan:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseButton1 then
+            dragging = true
+            dragStart = input.Position
+            startPos = guiElement.Position
+
+            input.Changed:Connect(function()
+                if input.UserInputState == Enum.UserInputState.End then
+                    dragging = false
+                end
+            end)
+        end
+    end)
+
+    guiElement.InputChanged:Connect(function(input)
+        if input.UserInputType == Enum.UserInputType.MouseMovement then
+            dragInput = input
+        end
+    end)
+
+    game:GetService("UserInputService").InputChanged:Connect(function(input)
+        if input == dragInput and dragging then
+            update(input)
+        end
+    end)
+end
+
+-- Kurangi ukuran GUI agar lebih kecil
+local MainFrame = Window.Frame -- Asumsi GUI ada di frame utama
+MainFrame.Size = UDim2.new(0.3, 0, 0.4, 0) -- Ukuran GUI lebih kecil
+makeGuiDraggable(MainFrame) -- Buat GUI dapat di-drag
