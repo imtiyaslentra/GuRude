@@ -51,6 +51,7 @@ local spamDelay = 0.1
 local lastBallSpeed = 0
 local curveThreshold = 5
 local stopThreshold = 0.1
+local isParrying = false 
 
 local function getPlayerPing(player)
     local success, ping = pcall(function()
@@ -83,7 +84,7 @@ local function updateIndicatorPosition(ball)
 end
 
 local function checkProximityToPlayer(ball, player)
-    if not autoParryActive then return end 
+    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
 
     local predictionTime = calculatePredictionTime(ball, player)
     local realBallAttribute = ball:GetAttribute("realBall")
@@ -91,10 +92,9 @@ local function checkProximityToPlayer(ball, player)
 
     local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
+    -- Logika untuk eksekusi parry dengan asynchronous
     if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
-        vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
-        wait(0.005)
-        vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
+        coroutine.wrap(performParry)() -- Memparry secara asynchronous agar tidak memblokir gerakan
         lastBallPressed = ball
         isKeyPressed = true
         OrionLib:MakeNotification({
@@ -108,13 +108,13 @@ local function checkProximityToPlayer(ball, player)
     end
 end
 
-local function performAutoSpam()
-    if not autoSpamActive then return end
-
-    while autoSpamActive do
-        vim:SendKeyEvent(true, Enum.KeyCode.Mouse1, false, nil)
-        wait(spamDelay)
-        vim:SendKeyEvent(false, Enum.KeyCode.Mouse1, false, nil)
+local function performParry()
+    if not isParrying then
+        isParrying = true
+        vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
+        wait(0.005)
+        vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
+        isParrying = false -- Set kembali setelah parry selesai
     end
 end
 
