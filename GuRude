@@ -1,6 +1,5 @@
 local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
 
--- Membuat window utama
 local Window = OrionLib:MakeWindow({
     Name = "Blade Ball",
     HidePremium = false,
@@ -27,7 +26,6 @@ local Tab = Window:MakeTab({
     PremiumOnly = false
 })
 
--- SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local workspace = game:GetService("Workspace")
 local players = game:GetService("Players")
@@ -84,7 +82,7 @@ local function updateIndicatorPosition(ball)
 end
 
 local function checkProximityToPlayer(ball, player)
-    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
+    if not autoParryActive then return end
 
     local predictionTime = calculatePredictionTime(ball, player)
     local realBallAttribute = ball:GetAttribute("realBall")
@@ -92,9 +90,8 @@ local function checkProximityToPlayer(ball, player)
 
     local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
 
-    -- Logika untuk eksekusi parry dengan asynchronous
     if predictionTime <= ballSpeedThreshold + 0.1 and realBallAttribute == true and target == player.Name and not isKeyPressed then
-        coroutine.wrap(performParry)() -- Memparry secara asynchronous agar tidak memblokir gerakan
+        performParry() 
         lastBallPressed = ball
         isKeyPressed = true
         OrionLib:MakeNotification({
@@ -112,9 +109,9 @@ local function performParry()
     if not isParrying then
         isParrying = true
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
-        wait(0.005)
+        wait(0.001)
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
-        isParrying = false -- Set kembali setelah parry selesai
+        isParrying = false
     end
 end
 
@@ -131,43 +128,16 @@ end
 
 local function checkBallsProximity()
     local player = players.LocalPlayer
-    if player then
+    if player and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local playerPosition = player.Character.HumanoidRootPart.Position
+
         for _, ball in pairs(ballFolder:GetChildren()) do
-            checkProximityToPlayer(ball, player)
-            updateIndicatorPosition(ball)
+            local ballPosition = ball.Position
+            local distanceToPlayer = (ballPosition - playerPosition).Magnitude
 
-            local ballSpeed = ball.Velocity.magnitude
-            local playersInProximity = 0
-
-            for _, otherPlayer in pairs(players:GetPlayers()) do
-                if otherPlayer ~= player and otherPlayer.Character and otherPlayer.Character:FindFirstChild("HumanoidRootPart") then
-                    local distance = (player.Character.HumanoidRootPart.Position - otherPlayer.Character.HumanoidRootPart.Position).magnitude
-                    if distance < 15 then 
-                        playersInProximity = playersInProximity + 1
-                        opponentPlayer = otherPlayer
-                    end
-                end
-            end
-
-            if playersInProximity == 1 then
-                if isBallCurving(ball) then
-                    ToggleAutoParry() 
-                elseif ballSpeed < stopThreshold then
-                    -- Jika bola berhenti
-                    if autoParryActive then
-                        ToggleAutoParry() -- Nonaktifkan Auto Parry jika bola berhenti
-                    end
-                else
-                    if ballSpeed > 0.5 and not autoSpamActive then
-                        ToggleAutoSpam()
-                    elseif ballSpeed <= 0.5 and autoSpamActive then
-                        ToggleAutoSpam()
-                    end
-                end
-            else
-                if autoSpamActive then
-                    ToggleAutoSpam()
-                end
+            if distanceToPlayer < 50 then
+                checkProximityToPlayer(ball, player)
+                updateIndicatorPosition(ball)
             end
         end
     end
