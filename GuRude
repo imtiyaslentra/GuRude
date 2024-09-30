@@ -148,17 +148,6 @@ local function CheckAutoParry()
     end
 end
 
--- Fungsi untuk menangani kesalahan yang mungkin terjadi
-local function HandleError(errorMessage)
-    OrionLib:MakeNotification({
-        Name = "Error Detected",
-        Content = errorMessage,
-        Image = nil,
-        Time = 5
-    })
-    warn(errorMessage)
-end
-
 -- Menambahkan tombol Toggle Auto Parry pada tab
 Tab:AddButton({
     Name = "Toggle Auto Parry",
