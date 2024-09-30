@@ -2,7 +2,7 @@ local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shl
 
 -- Membuat window utama
 local Window = OrionLib:MakeWindow({
-    Name = "Blade Ball",
+    Name = "Vico Hub",
     HidePremium = false,
     SaveConfig = true,
     ConfigFolder = "OrionTest",
@@ -38,87 +38,209 @@ local runService = game:GetService("RunService")
 local vim = game:GetService("VirtualInputManager")
 
 local ballFolder = workspace.Balls
+local indicatorPart = Instance.new("Part")
+indicatorPart.Size = Vector3.new(5, 5, 5)
+indicatorPart.Anchored = true
+indicatorPart.CanCollide = false
+indicatorPart.Transparency = 1
+indicatorPart.BrickColor = BrickColor.new("Bright red")
+indicatorPart.Parent = workspace
 
-local visualizerPart = Instance.new("Part") -- Part untuk visualizer
-visualizerPart.Size = Vector3.new(1, 1, 1)
-visualizerPart.Anchored = true
-visualizerPart.CanCollide = false
-visualizerPart.BrickColor = BrickColor.new("Bright yellow")
-visualizerPart.Transparency = 1 -- Mulai dengan tidak terlihat
-visualizerPart.Parent = workspace
-
+local lastBallPressed = nil
+local isKeyPressed = false
 local autoParryActive = false -- Status untuk toggle Auto Parry
-local showVisualizer = false -- Status untuk toggle visualizer
 
--- Fungsi untuk mendeteksi posisi dan kecepatan bola
-local function DetectBall()
-    local closestBall = nil
-    local closestDistance = math.huge
+-- Fungsi untuk menghitung waktu prediksi hingga tabrakan
+local function calculatePredictionTime(ball, player)
+    -- Pastikan bola dan pemain valid
+    if not ball or not ball:IsA("BasePart") then
+        warn("Invalid ball provided.")
+        return math.huge  -- Kembalikan nilai tidak terbatas jika bola tidak valid
+    end
+    
+    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
+        local rootPart = player.Character.HumanoidRootPart
+        local relativePosition = ball.Position - rootPart.Position
+        local velocity = ball.Velocity + (player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.RootPart.Velocity or Vector3.new(0, 0, 0))
+        
+        local a = (ball.Size.magnitude / 2)  -- Jari-jari bola
+        local b = relativePosition.magnitude  -- Jarak dari pemain ke bola
+        local c = math.sqrt(a * a + b * b)  -- Menghitung jarak diagonal
+        
+        -- Pastikan kecepatan tidak nol untuk menghindari pembagian dengan nol
+        if velocity.magnitude > 0 then
+            local timeToCollision = (c - a) / velocity.magnitude  -- Menghitung waktu tabrakan
+            return timeToCollision
+        else
+            warn("Velocity is zero, unable to calculate time to collision.")
+            return math.huge  -- Kembalikan nilai tidak terbatas jika kecepatan nol
+        end
+    else
+        warn("Player character is not valid.")
+    end
+    
+    return math.huge  -- Kembalikan nilai tidak terbatas jika kondisi tidak terpenuhi
+end
 
+-- Pastikan indicatorPart sudah didefinisikan sebelumnya
+local indicatorPart = Instance.new("Part")
+indicatorPart.Size = Vector3.new(1, 1, 1)
+indicatorPart.Color = Color3.fromRGB(255, 0, 0) -- Merah
+indicatorPart.Anchored = true
+indicatorPart.Parent = workspace -- Menempatkan di workspace
+
+local function updateIndicatorPosition(ball)
+    if ball and ball:IsA("BasePart") then  -- Memastikan bahwa ball adalah BasePart
+        indicatorPart.Position = ball.Position + Vector3.new(0, 2, 0) -- Posisi sedikit di atas bola
+    else
+        warn("Invalid ball or ball is not a BasePart!")
+    end
+end
+
+-- Contoh penggunaan: panggil fungsi ini saat bola bergerak
+local ball = workspace:FindFirstChild("Ball") -- Ganti dengan objek bola yang tepat
+if ball then
+    updateIndicatorPosition(ball)
+end
+
+-- Fungsi untuk memeriksa kedekatan bola dengan pemain
+local function checkProximityToPlayer(ball, player)
+    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
+
+    local predictionTime = calculatePredictionTime(ball, player)
+    local realBallAttribute = ball:GetAttribute("realBall")
+    local target = ball:GetAttribute("target")
+
+    -- Menghitung threshold kecepatan bola
+    local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
+
+    -- Logika untuk eksekusi parry
+    if predictionTime <= ballSpeedThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
+        -- Eksekusi parry
+        vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil) -- Menekan tombol F
+        wait(0.005) -- Tunggu sebentar
+        vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil) -- Melepaskan tombol F
+        lastBallPressed = ball
+        isKeyPressed = true
+        OrionLib:MakeNotification({
+            Name = "Parry Executed",
+            Content = "Successfully executed parry!",
+            Image = nil,
+            Time = 3
+        })
+    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
+        -- Reset isKeyPressed jika kondisi tidak lagi terpenuhi
+        isKeyPressed = false
+    end
+end
+-- Fungsi untuk memeriksa kedekatan bola
+local function checkBallsProximity()
+    local player = players.LocalPlayer
+    if not player then
+        warn("Local player not found! Ensure this script is running on the client.")
+        return
+    end
+
+    -- Menghitung jarak antara pemain dan bola
     for _, ball in pairs(ballFolder:GetChildren()) do
-        if ball:IsA("Ball") then
-            local distance = (players.LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
-            if distance < closestDistance then
-                closestDistance = distance
-                closestBall = ball
+        if ball:IsA("Part") then
+            local ballPosition = ball.Position
+            
+            -- Menggunakan posisi pemain untuk pemeriksaan jarak
+            local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then
+                warn("Player's HumanoidRootPart not found!")
+                return
+            end
+            
+            local playerPosition = humanoidRootPart.Position
+            local distance = (playerPosition - ballPosition).magnitude
+            
+            -- Di sini, tambahkan logika untuk memeriksa jarak dan melakukan tindakan yang diperlukan
+            if distance < 10 then -- Ganti 10 dengan jarak yang sesuai
+                -- Logika jika jarak bola cukup dekat
+                print("Ball is within proximity!")
             end
         end
     end
-
-    return closestBall, closestDistance
 end
 
--- Fungsi utama untuk memeriksa kondisi Auto Parry
-local function CheckAutoParry()
-    if not autoParryActive then 
-        visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika Auto Parry tidak aktif
-        return 
+runService.Heartbeat:Connect(checkBallsProximity)
+    -- Mendapatkan posisi pemain
+    local function getPlayerPosition()
+    local player = players.LocalPlayer
+    if not player then
+        warn("Local player not found!")
+        return nil
     end
 
-    local closestBall, distanceToBall = DetectBall()
-    if closestBall then
-        visualizerPart.Position = closestBall.Position -- Memperbarui posisi visualizer
-        visualizerPart.Transparency = showVisualizer and 0.5 or 1 -- Tampilkan visualizer sesuai checkbox
+    local character = player.Character
+    if not character then
+        warn("Player character not found!")
+        return nil
+    end
 
-        -- Logika untuk menentukan apakah perlu melakukan parry
-        if distanceToBall < 10 then
-            -- Implementasikan logika parry di sini, misalnya:
-            print("Parry executed at position: ", visualizerPart.Position)
-            -- Panggil fungsi parry di sini
+    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
+    if not humanoidRootPart then
+        warn("Player's HumanoidRootPart not found for player: " .. player.Name)
+        return nil
+    end
+
+    return humanoidRootPart.Position
+end
+
+    -- Iterasi melalui semua bola dalam ballFolder
+    for _, ball in pairs(ballFolder:GetChildren()) do
+        if ball:IsA("Part") then
+            -- Menghitung jarak antara pemain dan bola
+            local distance = (ball.Position - playerPosition).Magnitude
+
+            -- Jika bola dalam jarak tertentu, berikan notifikasi
+            if distance < 10 then -- Misalnya, jarak 10 unit untuk trigger
+                OrionLib:MakeNotification({
+                    Name = "Ball Proximity Alert",
+                    Content = "A ball is close to you!",
+                    Image = nil,
+                    Time = 5
+                })
+            end
+
+            -- Memperbarui posisi visualizer
+            updateIndicatorPosition(ball)
+        else
+            warn("Object is not a Part: " .. ball.Name)
         end
+    end
+end
+
+runService.Heartbeat:Connect(checkBallsProximity)
+
+-- Fungsi toggle untuk Auto Parry
+local function ToggleAutoParry()
+    autoParryActive = not autoParryActive
+    if autoParryActive then
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Activated",
+            Content = "Auto Parry is now active!",
+            Image = nil,
+            Time = 3
+        })
     else
-        visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika tidak ada bola
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Deactivated",
+            Content = "Auto Parry has been turned off.",
+            Image = nil,
+            Time = 3
+        })
     end
 end
 
 -- Tombol Toggle Auto Parry pada tab
 Tab:AddButton({
-    Name = "Toggle Auto Parry",
+    Name = "Auto Parry",
     Callback = function()
-        autoParryActive = not autoParryActive
-        local status = autoParryActive and "activated" or "deactivated"
-        OrionLib:MakeNotification({
-            Name = "Auto Parry " .. status,
-            Content = "Auto Parry is now " .. status .. "!",
-            Image = nil,
-            Time = 3
-        })
+        ToggleAutoParry()
     end
 })
-
--- Menambahkan checkbox untuk menampilkan visualizer
-Tab:AddToggle({
-    Name = "Show Visualizer",
-    Default = false,
-    Callback = function(value)
-        showVisualizer = value
-        visualizerPart.Transparency = value and 0.5 or 1 -- Set transparansi sesuai dengan checkbox
-    end
-})
-
--- Menjalankan fungsi Auto Parry dalam loop
-runService.RenderStepped:Connect(function()
-    pcall(CheckAutoParry) -- Menggunakan pcall untuk menangani kesalahan tanpa menghentikan skrip
-end)
 
 print("Script ran without errors")
