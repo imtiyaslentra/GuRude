@@ -37,7 +37,12 @@ local players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local vim = game:GetService("VirtualInputManager")
 
-local ballFolder = workspace.Balls
+local ballFolder = workspace:FindFirstChild("Balls")
+if not ballFolder then
+    warn("Balls folder not found in workspace!")
+    return
+end
+
 local indicatorPart = Instance.new("Part")
 indicatorPart.Size = Vector3.new(5, 5, 5)
 indicatorPart.Anchored = true
@@ -61,7 +66,7 @@ local function calculatePredictionTime(ball, player)
     if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
         local rootPart = player.Character.HumanoidRootPart
         local relativePosition = ball.Position - rootPart.Position
-        local velocity = ball.Velocity + (player.Character:FindFirstChildOfClass("Humanoid") and player.Character.Humanoid.RootPart.Velocity or Vector3.new(0, 0, 0))
+        local velocity = ball.Velocity + (player.Character:FindFirstChildOfClass("Humanoid") and player.Character.HumanoidRootPart.Velocity or Vector3.new(0, 0, 0))
         
         local a = (ball.Size.magnitude / 2)  -- Jari-jari bola
         local b = relativePosition.magnitude  -- Jarak dari pemain ke bola
@@ -82,25 +87,12 @@ local function calculatePredictionTime(ball, player)
     return math.huge  -- Kembalikan nilai tidak terbatas jika kondisi tidak terpenuhi
 end
 
--- Pastikan indicatorPart sudah didefinisikan sebelumnya
-local indicatorPart = Instance.new("Part")
-indicatorPart.Size = Vector3.new(1, 1, 1)
-indicatorPart.Color = Color3.fromRGB(255, 0, 0) -- Merah
-indicatorPart.Anchored = true
-indicatorPart.Parent = workspace -- Menempatkan di workspace
-
 local function updateIndicatorPosition(ball)
     if ball and ball:IsA("BasePart") then  -- Memastikan bahwa ball adalah BasePart
         indicatorPart.Position = ball.Position + Vector3.new(0, 2, 0) -- Posisi sedikit di atas bola
     else
         warn("Invalid ball or ball is not a BasePart!")
     end
-end
-
--- Contoh penggunaan: panggil fungsi ini saat bola bergerak
-local ball = workspace:FindFirstChild("Ball") -- Ganti dengan objek bola yang tepat
-if ball then
-    updateIndicatorPosition(ball)
 end
 
 -- Fungsi untuk memeriksa kedekatan bola dengan pemain
@@ -133,6 +125,7 @@ local function checkProximityToPlayer(ball, player)
         isKeyPressed = false
     end
 end
+
 -- Fungsi untuk memeriksa kedekatan bola
 local function checkBallsProximity()
     local player = players.LocalPlayer
@@ -160,53 +153,9 @@ local function checkBallsProximity()
             if distance < 10 then -- Ganti 10 dengan jarak yang sesuai
                 -- Logika jika jarak bola cukup dekat
                 print("Ball is within proximity!")
+                checkProximityToPlayer(ball, player) -- Panggil untuk memeriksa kedekatan dengan pemain
+                updateIndicatorPosition(ball) -- Memperbarui posisi visualizer
             end
-        end
-    end
-end
-
-runService.Heartbeat:Connect(checkBallsProximity)
-    -- Mendapatkan posisi pemain
-    local function getPlayerPosition()
-    local player = players.LocalPlayer
-    if not player then
-        warn("Local player not found!")
-        return nil
-    end
-
-    local character = player.Character
-    if not character then
-        warn("Player character not found!")
-        return nil
-    end
-
-    local humanoidRootPart = character:FindFirstChild("HumanoidRootPart")
-    if not humanoidRootPart then
-        warn("Player's HumanoidRootPart not found for player: " .. player.Name)
-        return nil
-    end
-
-    return humanoidRootPart.Position
-end
-
-    -- Iterasi melalui semua bola dalam ballFolder
-    for _, ball in pairs(ballFolder:GetChildren()) do
-        if ball:IsA("Part") then
-            -- Menghitung jarak antara pemain dan bola
-            local distance = (ball.Position - playerPosition).Magnitude
-
-            -- Jika bola dalam jarak tertentu, berikan notifikasi
-            if distance < 10 then -- Misalnya, jarak 10 unit untuk trigger
-                OrionLib:MakeNotification({
-                    Name = "Ball Proximity Alert",
-                    Content = "A ball is close to you!",
-                    Image = nil,
-                    Time = 5
-                })
-            end
-
-            -- Memperbarui posisi visualizer
-            updateIndicatorPosition(ball)
         else
             warn("Object is not a Part: " .. ball.Name)
         end
