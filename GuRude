@@ -112,8 +112,12 @@ local function checkProximityToPlayer(ball, player)
         vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil) -- Menekan tombol F
         wait(0.005) -- Tunggu sebentar
         vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil) -- Melepaskan tombol F
+        
+        -- Memperbarui status parry
         lastBallPressed = ball
         isKeyPressed = true
+
+        -- Notifikasi bahwa parry berhasil
         OrionLib:MakeNotification({
             Name = "Parry Executed",
             Content = "Successfully executed parry!",
@@ -123,16 +127,45 @@ local function checkProximityToPlayer(ball, player)
     elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
         -- Reset isKeyPressed jika kondisi tidak lagi terpenuhi
         isKeyPressed = false
+        lastBallPressed = nil -- Reset lastBallPressed untuk mencegah parry berulang
     end
 end
 
--- Fungsi untuk memeriksa kedekatan bola
+-- Memperbaiki fungsi checkBallsProximity untuk memanggil checkProximityToPlayer
 local function checkBallsProximity()
     local player = players.LocalPlayer
     if not player then
         warn("Local player not found! Ensure this script is running on the client.")
         return
     end
+
+    -- Menghitung jarak antara pemain dan bola
+    for _, ball in pairs(ballFolder:GetChildren()) do
+        if ball:IsA("Part") then
+            local ballPosition = ball.Position
+            
+            -- Menggunakan posisi pemain untuk pemeriksaan jarak
+            local humanoidRootPart = player.Character and player.Character:FindFirstChild("HumanoidRootPart")
+            if not humanoidRootPart then
+                warn("Player's HumanoidRootPart not found!")
+                return
+            end
+            
+            local playerPosition = humanoidRootPart.Position
+            local distance = (playerPosition - ballPosition).magnitude
+            
+            -- Di sini, tambahkan logika untuk memeriksa jarak dan melakukan tindakan yang diperlukan
+            if distance < 10 then -- Ganti 10 dengan jarak yang sesuai
+                -- Logika jika jarak bola cukup dekat
+                print("Ball is within proximity!")
+                checkProximityToPlayer(ball, player) -- Panggil untuk memeriksa kedekatan dengan pemain
+                updateIndicatorPosition(ball) -- Memperbarui posisi visualizer
+            end
+        else
+            warn("Object is not a Part: " .. ball.Name)
+        end
+    end
+end
 
     -- Menghitung jarak antara pemain dan bola
     for _, ball in pairs(ballFolder:GetChildren()) do
