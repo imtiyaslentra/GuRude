@@ -51,9 +51,8 @@ visualizerPart.Size = Vector3.new(1, 1, 1)
 visualizerPart.Anchored = true
 visualizerPart.CanCollide = false
 visualizerPart.BrickColor = BrickColor.new("Bright yellow")
-visualizerPart.Transparency = 0.5
+visualizerPart.Transparency = 1 -- Mulai dengan tidak terlihat
 visualizerPart.Parent = workspace
-visualizerPart.Visible = false -- Mulai dengan tidak terlihat
 
 local lastBallPressed = nil
 local isKeyPressed = false
@@ -118,7 +117,7 @@ end
 -- Fungsi utama untuk memeriksa kondisi Auto Parry
 local function CheckAutoParry()
     if not autoParryActive then 
-        visualizerPart.Visible = false -- Sembunyikan visualizer jika Auto Parry tidak aktif
+        visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika Auto Parry tidak aktif
         return 
     end
 
@@ -129,13 +128,13 @@ local function CheckAutoParry()
         -- Deteksi tambahan untuk memastikan bola tidak berhenti
         if IsBallStationary(closestBall) then
             print("Ball is stationary, not executing parry.")
-            visualizerPart.Visible = false -- Sembunyikan visualizer jika bola berhenti
+            visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika bola berhenti
             return
         end
 
         -- Perbarui posisi visualizer
         visualizerPart.Position = predictedPosition
-        visualizerPart.Visible = showVisualizer -- Tampilkan visualizer sesuai checkbox
+        visualizerPart.Transparency = showVisualizer and 0.5 or 1 -- Tampilkan visualizer sesuai checkbox
 
         -- Logika untuk menentukan apakah perlu melakukan parry
         if distanceToBall < 10 then
@@ -144,7 +143,7 @@ local function CheckAutoParry()
             -- Panggil fungsi parry di sini
         end
     else
-        visualizerPart.Visible = false -- Sembunyikan visualizer jika tidak ada bola
+        visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika tidak ada bola
     end
 end
 
@@ -162,7 +161,7 @@ Tab:AddToggle({
     Default = false,
     Callback = function(value)
         showVisualizer = value
-        visualizerPart.Visible = value -- Set visibilitas sesuai dengan checkbox
+        visualizerPart.Transparency = value and 0.5 or 1 -- Set transparansi sesuai dengan checkbox
     end
 })
 
