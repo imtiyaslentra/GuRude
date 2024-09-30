@@ -1,137 +1,146 @@
 -- SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local Workspace = game:GetService("Workspace")
-local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
+local workspace = game:GetService("Workspace")
+local players = game:GetService("Players")
+local runService = game:GetService("RunService")
+local vim = game:GetService("VirtualInputManager")
 
--- Fungsi untuk menghitung waktu prediksi hingga tabrakan
-local function timeUntilImpact(ballVelocity, distanceToPlayer, playerVelocity)
-    local relativeVelocity = ballVelocity - playerVelocity
-    return distanceToPlayer / relativeVelocity.Magnitude
+-- Memuat Orion Library
+local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+
+-- Remote Event untuk Parry
+local ParryEvent = ReplicatedStorage:WaitForChild("ParryEvent")
+
+-- Variabel untuk data
+local data = {
+    target_Count = 0,
+    taken_time = 1,
+    hit_Count = 0,
+    is_ball_Warping = false,
+    is_Spamming = false,
+    canParry = true,
+    last_target = nil,
+    is_parrying = false,
+    last_parry_time = 0,
+    parry_count = 0,
+    distance_player_to_ball = 0,
+    ping = players.LocalPlayer:GetNetworkPing(), -- Ping saat ini
+}
+
+local local_player = players.LocalPlayer
+
+-- GUI Setup
+local window = OrionLib:MakeWindow({
+    Name = "Auto Parry",
+    HidePremium = false,
+    IntroText = "Welcome to Auto Parry!",
+    SaveConfig = true,
+    ConfigFolder = "OrionTest"
+})
+
+local tab = window:MakeTab({
+    Name = "Settings",
+    Icon = "rbxassetid://4483345998",
+    PremiumOnly = false
+})
+
+-- Toggle untuk Auto Parry
+tab:AddToggle({
+    Name = "Enable Auto Parry",
+    Default = false,
+    Callback = function(value)
+        data.autoParryEnabled = value
+    end
+})
+
+-- Mendapatkan bola
+local function getBall()
+    return training_mode and getTrainingBall() or Nurysium_Util.getBall()
 end
 
--- Fungsi untuk mendapatkan threshold dinamis berdasarkan kecepatan bola
-local function getDynamicThreshold(ballVelocityTowardsPlayer)
-    return math.max(0.31, 0.5 - ballVelocityTowardsPlayer * 0.01)
+-- Fungsi untuk mendeteksi ping
+local function updatePing()
+    data.ping = players.LocalPlayer:GetNetworkPing()
 end
 
--- Fungsi untuk menentukan apakah karakter sedang berjalan atau tidak
-local function isWalkSpeedZero(character)
-    return character and character:FindFirstChild("Humanoid") and character.Humanoid.WalkSpeed == 0
-end
+-- Fungsi untuk menangani parry
+local function handleParry()
+    local ball = getBall()
+    updatePing() -- Update ping setiap kali parry ditangani
 
--- AutoParry logic
-local function checkBallDistance(character, focusedBall)
-    if not character or not character:FindFirstChild("Highlight") then return end
-
-    local charPos = character.PrimaryPart.Position
-    local charVel = character.PrimaryPart.Velocity
-
-    if focusedBall and not focusedBall.Parent then
-        print("Focused ball lost parent. Choosing a new focused ball.")
-        chooseNewFocusedBall()
-    end
-    if not focusedBall then 
-        print("No focused ball.")
-        chooseNewFocusedBall()
+    if not ball then
+        -- Reset data jika bola tidak ada
+        data.target_Count = 0
+        data.taken_time = 1
+        data.hit_Count = 0
+        data.is_ball_Warping = false
+        data.is_Spamming = false
+        data.canParry = true
+        data.last_target = nil
+        return
     end
 
-    local ball = focusedBall
-    local distanceToPlayer = (ball.Position - charPos).Magnitude
-    local ballVelocityTowardsPlayer = ball.Velocity:Dot((charPos - ball.Position).Unit)
-    
-    -- Kondisi Auto Parry saat bola mendekat
-    if distanceToPlayer < 10 then
-        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
+    -- Deteksi target dan update
+    ball:GetAttributeChangedSignal('target'):Once(function()
+        data.canParry = true
+    end)
+
+    if ball:GetAttribute('target') == local_player.Name then
+        data.target_Count = data.target_Count + 1
     end
 
-    -- Cek waktu hingga benturan dan threshold untuk memparry
-    if timeUntilImpact(ball.Velocity, distanceToPlayer, charVel) < getDynamicThreshold(ballVelocityTowardsPlayer) then
-        if character.Abilities["Raging Deflection"].Enabled and UseRage == true then
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game) -- Simulasi kemampuan
-            if not isWalkSpeedZero(character) then
-                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
-            end
-        else
-            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
+    task.delay(0.2, function()
+        data.target_Count = data.target_Count - 1
+    end)
+
+    -- Penghitungan posisi dan kecepatan bola
+    local ball_Position = ball.Position
+    local player_Position = local_player.Character.PrimaryPart.Position
+    data.distance_player_to_ball = (player_Position - ball_Position).Magnitude
+
+    -- Logika Prediksi untuk pergerakan bola
+    local ball_Velocity = ball.AssemblyLinearVelocity
+    local predictionTime = 0.25 + (data.ping / 100) -- Prediksi waktu berdasarkan ping
+    local ball_PredictedPosition = ball_Position + (ball_Velocity * predictionTime)
+
+    -- Logika Parry
+    if data.autoParryEnabled and (data.is_parrying == false and data.canParry) then
+        if data.distance_player_to_ball <= 10 and (tick() - data.last_parry_time) >= 0.5 then
+            ParryEvent:FireServer() -- Mengirim event ke server
+            data.is_parrying = true
+            data.last_parry_time = tick()
+            data.parry_count = data.parry_count + 1
+
+            -- Notifikasi parry menggunakan Orion
+            OrionLib:MakeNotification({
+                Name = "Parry Executed",
+                Content = "Successfully executed parry!",
+                Image = nil,
+                Time = 3
+            })
+
+            -- Reset status parry setelah beberapa detik
+            task.delay(0.1, function()
+                data.is_parrying = false
+            end)
         end
     end
-end
 
--- Membuat GUI utama
-local ScreenGui = Instance.new("ScreenGui")
-local Frame = Instance.new("Frame")
-local Title = Instance.new("TextLabel")
-local AutoParryToggle = Instance.new("TextButton")
-local Checkbox = Instance.new("TextButton")
-
--- Setup GUI
-ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
-Frame.Parent = ScreenGui
-Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-Frame.Position = UDim2.new(0.35, 0, 0.35, 0)
-Frame.Size = UDim2.new(0, 300, 0, 200)
-Frame.BorderSizePixel = 0
-
-Title.Parent = Frame
-Title.Text = "Blade Ball Auto-Parry System"
-Title.TextColor3 = Color3.new(1, 1, 1)
-Title.TextSize = 20
-Title.Size = UDim2.new(1, 0, 0, 50)
-Title.BackgroundTransparency = 1
-createGradient(Title)  -- Tambahkan gradient warna-warni pada title
-
--- Tombol untuk Toggle Auto Parry
-AutoParryToggle.Parent = Frame
-AutoParryToggle.Text = "Toggle Auto Parry"
-AutoParryToggle.Size = UDim2.new(0.8, 0, 0.2, 0)
-AutoParryToggle.Position = UDim2.new(0.1, 0, 0.4, 0)
-AutoParryToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
-AutoParryToggle.TextColor3 = Color3.new(1, 1, 1)
-AutoParryToggle.TextSize = 16
-
--- Checkbox untuk status AutoParry
-Checkbox.Parent = Frame
-Checkbox.Size = UDim2.new(0.2, 0, 0.2, 0)
-Checkbox.Position = UDim2.new(0.7, 0, 0.4, 0)
-Checkbox.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Checkbox awal dalam kondisi tidak aktif
-
--- Variabel untuk AutoParry
-local autoParryActive = false
-local heartbeatConnection
-
--- Fungsi untuk mengaktifkan AutoParry
-local function startAutoParry(character, focusedBall)
-    if heartbeatConnection then return end
-    heartbeatConnection = RunService.Heartbeat:Connect(function()
-        checkBallDistance(character, focusedBall)
-    end)
-end
-
--- Fungsi untuk menghentikan AutoParry
-local function stopAutoParry()
-    if heartbeatConnection then
-        heartbeatConnection:Disconnect()
-        heartbeatConnection = nil
-    end
-end
-
--- Fungsi Toggle Auto Parry
-AutoParryToggle.MouseButton1Click:Connect(function()
-    autoParryActive = not autoParryActive
-    Checkbox.BackgroundColor3 = autoParryActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0) -- Ganti warna checkbox
-    print(autoParryActive and "Auto Parry Activated" or "Auto Parry Deactivated")
-    animateGui(Frame, autoParryActive) -- Animasi fade ketika toggle
-
-    if autoParryActive then
-        local character = Players.LocalPlayer.Character
-        local focusedBall = Workspace:FindFirstChild("Ball") -- Ganti dengan logika untuk memilih bola yang tepat
-        startAutoParry(character, focusedBall)
+    -- Spam Parry Logic
+    if data.distance_player_to_ball < 15 then
+        data.is_Spamming = true
     else
-        stopAutoParry()
+        data.is_Spamming = false
     end
-end)
 
--- Animasi fade-in saat GUI muncul
-animateGui(Frame, true)
+    -- Penanganan Warp
+    if data.distance_player_to_ball < 10 and data.target_Count > 0 then
+        data.is_ball_Warping = tick() - (data.last_target and (ball_Position - data.last_target.HumanoidRootPart.Position).Magnitude < 35.5 and tick() or 0) > 0.15
+    end
+end
+
+-- Menggunakan RunService untuk memanggil handleParry setiap frame
+runService.RenderStepped:Connect(handleParry)
+
+-- Menyimpan konfigurasi GUI saat ditutup
+OrionLib:Init()
