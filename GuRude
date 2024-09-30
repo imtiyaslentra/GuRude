@@ -1,147 +1,137 @@
-local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
-
--- Membuat window utama dengan animasi dan warna pada title
-local Window = OrionLib:MakeWindow({
-    Name = "Vico Hub - [Just A Noob Hub]",
-    HidePremium = false,
-    SaveConfig = true,
-    ConfigFolder = "OrionTest",
-    IntroEnabled = true, -- Animasi saat GUI dimulai
-    IntroText = "Vico Hub",
-    Color = Color3.fromRGB(255, 100, 100) -- Judul warna-warni
-})
-
--- Notifikasi ketika GUI di-load
-OrionLib:MakeNotification({
-    Name = "Execution Started",
-    Content = "GUI successfully loaded!",
-    Image = "rbxassetid://4483362458", -- Menambahkan icon
-    Time = 5
-})
-
--- Tab utama
-local Tab = Window:MakeTab({
-    Name = "Main",
-    Icon = "rbxassetid://4483362458",
-    PremiumOnly = false
-})
-
 -- SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local workspace = game:GetService("Workspace")
-local players = game:GetService("Players")
-local runService = game:GetService("RunService")
-local vim = game:GetService("VirtualInputManager")
-
-local ballFolder = workspace.Balls
-local indicatorPart = Instance.new("Part")
-indicatorPart.Size = Vector3.new(5, 5, 5)
-indicatorPart.Anchored = true
-indicatorPart.CanCollide = false
-indicatorPart.Transparency = 1
-indicatorPart.BrickColor = BrickColor.new("Bright red")
-indicatorPart.Parent = workspace
-
-local lastBallPressed = nil
-local isKeyPressed = false
-local autoParryActive = false -- Status untuk toggle Auto Parry
-local autoSpamActive = false -- Status untuk toggle Auto Spam
+local Workspace = game:GetService("Workspace")
+local Players = game:GetService("Players")
+local RunService = game:GetService("RunService")
+local VirtualInputManager = game:GetService("VirtualInputManager")
 
 -- Fungsi untuk menghitung waktu prediksi hingga tabrakan
-local function calculatePredictionTime(ball, player)
-    if player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-        local rootPart = player.Character.HumanoidRootPart
-        local relativePosition = ball.Position - rootPart.Position
-        local velocity = ball.Velocity + rootPart.Velocity
-        local a = (ball.Size.magnitude / 2) 
-        local b = relativePosition.magnitude
-        local c = math.sqrt(a * a + b * b)
-        local timeToCollision = (c - a) / velocity.magnitude
-        return timeToCollision
+local function timeUntilImpact(ballVelocity, distanceToPlayer, playerVelocity)
+    local relativeVelocity = ballVelocity - playerVelocity
+    return distanceToPlayer / relativeVelocity.Magnitude
+end
+
+-- Fungsi untuk mendapatkan threshold dinamis berdasarkan kecepatan bola
+local function getDynamicThreshold(ballVelocityTowardsPlayer)
+    return math.max(0.31, 0.5 - ballVelocityTowardsPlayer * 0.01)
+end
+
+-- Fungsi untuk menentukan apakah karakter sedang berjalan atau tidak
+local function isWalkSpeedZero(character)
+    return character and character:FindFirstChild("Humanoid") and character.Humanoid.WalkSpeed == 0
+end
+
+-- AutoParry logic
+local function checkBallDistance(character, focusedBall)
+    if not character or not character:FindFirstChild("Highlight") then return end
+
+    local charPos = character.PrimaryPart.Position
+    local charVel = character.PrimaryPart.Velocity
+
+    if focusedBall and not focusedBall.Parent then
+        print("Focused ball lost parent. Choosing a new focused ball.")
+        chooseNewFocusedBall()
     end
-    return math.huge
-end
-
--- Fungsi untuk memperbarui posisi indikator
-local function updateIndicatorPosition(ball)
-    indicatorPart.Position = ball.Position
-end
-
--- Fungsi untuk memeriksa kedekatan bola dengan pemain
-local function checkProximityToPlayer(ball, player)
-    if not autoParryActive then return end -- Hentikan fungsi jika Auto Parry tidak aktif
-
-    local predictionTime = calculatePredictionTime(ball, player)
-    local realBallAttribute = ball:GetAttribute("realBall")
-    local target = ball:GetAttribute("target")
-    local ballSpeedThreshold = math.max(0.31, 0.5 - ball.Velocity.magnitude * 0.01)
-
-    if predictionTime <= ballSpeedThreshold and realBallAttribute == true and target == player.Name and not isKeyPressed then
-        vim:SendKeyEvent(true, Enum.KeyCode.F, false, nil)
-        wait(0.005)
-        vim:SendKeyEvent(false, Enum.KeyCode.F, false, nil)
-        lastBallPressed = ball
-        isKeyPressed = true
-        OrionLib:MakeNotification({
-            Name = "Parry Executed",
-            Content = "Successfully executed parry!",
-            Image = nil,
-            Time = 3
-        })
-    elseif lastBallPressed == ball and (predictionTime > ballSpeedThreshold or realBallAttribute ~= true or target ~= player.Name) then
-        isKeyPressed = false
+    if not focusedBall then 
+        print("No focused ball.")
+        chooseNewFocusedBall()
     end
-end
 
--- Fungsi untuk memeriksa kedekatan bola
-local function checkBallsProximity()
-    local player = players.LocalPlayer
-    if player then
-        for _, ball in pairs(ballFolder:GetChildren()) do
-            checkProximityToPlayer(ball, player)
-            updateIndicatorPosition(ball)
+    local ball = focusedBall
+    local distanceToPlayer = (ball.Position - charPos).Magnitude
+    local ballVelocityTowardsPlayer = ball.Velocity:Dot((charPos - ball.Position).Unit)
+    
+    -- Kondisi Auto Parry saat bola mendekat
+    if distanceToPlayer < 10 then
+        VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
+    end
+
+    -- Cek waktu hingga benturan dan threshold untuk memparry
+    if timeUntilImpact(ball.Velocity, distanceToPlayer, charVel) < getDynamicThreshold(ballVelocityTowardsPlayer) then
+        if character.Abilities["Raging Deflection"].Enabled and UseRage == true then
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.F, false, game) -- Simulasi kemampuan
+            if not isWalkSpeedZero(character) then
+                VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
+            end
+        else
+            VirtualInputManager:SendKeyEvent(true, Enum.KeyCode.E, false, game) -- Simulasi tombol parry
         end
     end
 end
 
-runService.Heartbeat:Connect(checkBallsProximity)
+-- Membuat GUI utama
+local ScreenGui = Instance.new("ScreenGui")
+local Frame = Instance.new("Frame")
+local Title = Instance.new("TextLabel")
+local AutoParryToggle = Instance.new("TextButton")
+local Checkbox = Instance.new("TextButton")
 
--- Fungsi toggle untuk Auto Parry
-local function ToggleAutoParry()
-    autoParryActive = not autoParryActive
-    if autoParryActive then
-        -- Notifikasi dengan step by step
-        OrionLib:MakeNotification({
-            Name = "Execute Autoparry",
-            Content = "Waiting System...",
-            Image = "rbxassetid://4483362458",
-            Time = 2
-        })
-        wait(1)
-        OrionLib:MakeNotification({
-            Name = "Checking System Parry",
-            Content = "System Parry Work With Detect!",
-            Image = "rbxassetid://4483362458",
-            Time = 3
-        })
-    else
-        OrionLib:MakeNotification({
-            Name = "Auto Parry Deactivated",
-            Content = "Auto Parry has been turned off.",
-            Image = nil,
-            Time = 3
-        })
+-- Setup GUI
+ScreenGui.Parent = Players.LocalPlayer:WaitForChild("PlayerGui")
+Frame.Parent = ScreenGui
+Frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+Frame.Position = UDim2.new(0.35, 0, 0.35, 0)
+Frame.Size = UDim2.new(0, 300, 0, 200)
+Frame.BorderSizePixel = 0
+
+Title.Parent = Frame
+Title.Text = "Blade Ball Auto-Parry System"
+Title.TextColor3 = Color3.new(1, 1, 1)
+Title.TextSize = 20
+Title.Size = UDim2.new(1, 0, 0, 50)
+Title.BackgroundTransparency = 1
+createGradient(Title)  -- Tambahkan gradient warna-warni pada title
+
+-- Tombol untuk Toggle Auto Parry
+AutoParryToggle.Parent = Frame
+AutoParryToggle.Text = "Toggle Auto Parry"
+AutoParryToggle.Size = UDim2.new(0.8, 0, 0.2, 0)
+AutoParryToggle.Position = UDim2.new(0.1, 0, 0.4, 0)
+AutoParryToggle.BackgroundColor3 = Color3.fromRGB(50, 50, 50)
+AutoParryToggle.TextColor3 = Color3.new(1, 1, 1)
+AutoParryToggle.TextSize = 16
+
+-- Checkbox untuk status AutoParry
+Checkbox.Parent = Frame
+Checkbox.Size = UDim2.new(0.2, 0, 0.2, 0)
+Checkbox.Position = UDim2.new(0.7, 0, 0.4, 0)
+Checkbox.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Checkbox awal dalam kondisi tidak aktif
+
+-- Variabel untuk AutoParry
+local autoParryActive = false
+local heartbeatConnection
+
+-- Fungsi untuk mengaktifkan AutoParry
+local function startAutoParry(character, focusedBall)
+    if heartbeatConnection then return end
+    heartbeatConnection = RunService.Heartbeat:Connect(function()
+        checkBallDistance(character, focusedBall)
+    end)
+end
+
+-- Fungsi untuk menghentikan AutoParry
+local function stopAutoParry()
+    if heartbeatConnection then
+        heartbeatConnection:Disconnect()
+        heartbeatConnection = nil
     end
 end
 
--- Menambahkan checkbox untuk Auto Parry
-Tab:AddToggle({
-    Name = "Enable Auto Parry",
-    Default = false,
-    Callback = function(state)
-        autoParryActive = state
-        ToggleAutoParry()
-    end
-})
+-- Fungsi Toggle Auto Parry
+AutoParryToggle.MouseButton1Click:Connect(function()
+    autoParryActive = not autoParryActive
+    Checkbox.BackgroundColor3 = autoParryActive and Color3.fromRGB(0, 255, 0) or Color3.fromRGB(255, 0, 0) -- Ganti warna checkbox
+    print(autoParryActive and "Auto Parry Activated" or "Auto Parry Deactivated")
+    animateGui(Frame, autoParryActive) -- Animasi fade ketika toggle
 
-print("Script successfully ran without errors")
+    if autoParryActive then
+        local character = Players.LocalPlayer.Character
+        local focusedBall = Workspace:FindFirstChild("Ball") -- Ganti dengan logika untuk memilih bola yang tepat
+        startAutoParry(character, focusedBall)
+    else
+        stopAutoParry()
+    end
+end)
+
+-- Animasi fade-in saat GUI muncul
+animateGui(Frame, true)
