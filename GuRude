@@ -1,3 +1,35 @@
+local OrionLib = loadstring(game:HttpGet(('https://raw.githubusercontent.com/shlexware/Orion/main/source')))()
+
+-- Membuat window utama
+local Window = OrionLib:MakeWindow({
+    Name = "Blade Ball",
+    HidePremium = false,
+    SaveConfig = true,
+    ConfigFolder = "OrionTest",
+})
+
+-- Memanggil Init pada objek Window
+if Window and type(Window.Init) == "function" then
+    Window:Init()
+else
+    warn("Window Init function is missing!")
+end
+
+-- Notifikasi ketika GUI di-load
+OrionLib:MakeNotification({
+    Name = "Execution Started",
+    Content = "GUI successfully loaded!",
+    Image = nil,
+    Time = 5
+})
+
+-- Tab utama
+local Tab = Window:MakeTab({
+    Name = "Main",
+    Icon = "rbxassetid://4483362458",
+    PremiumOnly = false
+})
+
 -- SERVICES
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local workspace = game:GetService("Workspace")
@@ -5,142 +37,149 @@ local players = game:GetService("Players")
 local runService = game:GetService("RunService")
 local vim = game:GetService("VirtualInputManager")
 
--- Memuat Orion Library
-local OrionLib = loadstring(game:HttpGet("https://raw.githubusercontent.com/shlexware/Orion/main/source"))()
+local ballFolder = workspace.Balls
+local indicatorPart = Instance.new("Part")
+indicatorPart.Size = Vector3.new(5, 5, 5)
+indicatorPart.Anchored = true
+indicatorPart.CanCollide = false
+indicatorPart.Transparency = 1
+indicatorPart.BrickColor = BrickColor.new("Bright red")
+indicatorPart.Parent = workspace
 
--- Remote Event untuk Parry
-local ParryEvent = ReplicatedStorage:WaitForChild("ParryEvent")
+local visualizerPart = Instance.new("Part") -- Part untuk visualizer
+visualizerPart.Size = Vector3.new(1, 1, 1)
+visualizerPart.Anchored = true
+visualizerPart.CanCollide = false
+visualizerPart.BrickColor = BrickColor.new("Bright yellow")
+visualizerPart.Transparency = 0.5
+visualizerPart.Parent = workspace
+visualizerPart.Visible = false -- Mulai dengan tidak terlihat
 
--- Variabel untuk data
-local data = {
-    target_Count = 0,
-    taken_time = 1,
-    hit_Count = 0,
-    is_ball_Warping = false,
-    is_Spamming = false,
-    canParry = true,
-    last_target = nil,
-    is_parrying = false,
-    last_parry_time = 0,
-    parry_count = 0,
-    distance_player_to_ball = 0,
-    ping = players.LocalPlayer:GetNetworkPing(), -- Ping saat ini
-}
+local lastBallPressed = nil
+local isKeyPressed = false
+local autoParryActive = false -- Status untuk toggle Auto Parry
+local showVisualizer = false -- Status untuk toggle visualizer
 
-local local_player = players.LocalPlayer
-
--- GUI Setup
-local window = OrionLib:MakeWindow({
-    Name = "Auto Parry",
-    HidePremium = false,
-    IntroText = "Welcome to Auto Parry!",
-    SaveConfig = true,
-    ConfigFolder = "OrionTest"
-})
-
-local tab = window:MakeTab({
-    Name = "Settings",
-    Icon = "rbxassetid://4483345998",
-    PremiumOnly = false
-})
-
--- Toggle untuk Auto Parry
-tab:AddToggle({
-    Name = "Enable Auto Parry",
-    Default = false,
-    Callback = function(value)
-        data.autoParryEnabled = value
+-- Fungsi toggle untuk Auto Parry
+local function ToggleAutoParry()
+    autoParryActive = not autoParryActive
+    if autoParryActive then
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Activated",
+            Content = "Auto Parry is now active!",
+            Image = nil,
+            Time = 3
+        })
+    else
+        OrionLib:MakeNotification({
+            Name = "Auto Parry Deactivated",
+            Content = "Auto Parry has been turned off.",
+            Image = nil,
+            Time = 3
+        })
     end
-})
-
--- Mendapatkan bola
-local function getBall()
-    return training_mode and getTrainingBall() or Nurysium_Util.getBall()
 end
 
 -- Fungsi untuk mendeteksi ping
-local function updatePing()
-    data.ping = players.LocalPlayer:GetNetworkPing()
+local function GetPing()
+    return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 10
 end
 
--- Fungsi untuk menangani parry
-local function handleParry()
-    local ball = getBall()
-    updatePing() -- Update ping setiap kali parry ditangani
+-- Fungsi untuk mendeteksi posisi dan kecepatan bola
+local function DetectBall()
+    local closestBall = nil
+    local closestDistance = math.huge
 
-    if not ball then
-        -- Reset data jika bola tidak ada
-        data.target_Count = 0
-        data.taken_time = 1
-        data.hit_Count = 0
-        data.is_ball_Warping = false
-        data.is_Spamming = false
-        data.canParry = true
-        data.last_target = nil
-        return
-    end
-
-    -- Deteksi target dan update
-    ball:GetAttributeChangedSignal('target'):Once(function()
-        data.canParry = true
-    end)
-
-    if ball:GetAttribute('target') == local_player.Name then
-        data.target_Count = data.target_Count + 1
-    end
-
-    task.delay(0.2, function()
-        data.target_Count = data.target_Count - 1
-    end)
-
-    -- Penghitungan posisi dan kecepatan bola
-    local ball_Position = ball.Position
-    local player_Position = local_player.Character.PrimaryPart.Position
-    data.distance_player_to_ball = (player_Position - ball_Position).Magnitude
-
-    -- Logika Prediksi untuk pergerakan bola
-    local ball_Velocity = ball.AssemblyLinearVelocity
-    local predictionTime = 0.25 + (data.ping / 100) -- Prediksi waktu berdasarkan ping
-    local ball_PredictedPosition = ball_Position + (ball_Velocity * predictionTime)
-
-    -- Logika Parry
-    if data.autoParryEnabled and (data.is_parrying == false and data.canParry) then
-        if data.distance_player_to_ball <= 10 and (tick() - data.last_parry_time) >= 0.5 then
-            ParryEvent:FireServer() -- Mengirim event ke server
-            data.is_parrying = true
-            data.last_parry_time = tick()
-            data.parry_count = data.parry_count + 1
-
-            -- Notifikasi parry menggunakan Orion
-            OrionLib:MakeNotification({
-                Name = "Parry Executed",
-                Content = "Successfully executed parry!",
-                Image = nil,
-                Time = 3
-            })
-
-            -- Reset status parry setelah beberapa detik
-            task.delay(0.1, function()
-                data.is_parrying = false
-            end)
+    for _, ball in pairs(ballFolder:GetChildren()) do
+        if ball:IsA("Ball") then
+            local distance = (players.LocalPlayer.Character.PrimaryPart.Position - ball.Position).Magnitude
+            if distance < closestDistance then
+                closestDistance = distance
+                closestBall = ball
+            end
         end
     end
 
-    -- Spam Parry Logic
-    if data.distance_player_to_ball < 15 then
-        data.is_Spamming = true
-    else
-        data.is_Spamming = false
+    return closestBall, closestDistance
+end
+
+-- Fungsi untuk memprediksi posisi bola
+local function PredictBallPosition(ball)
+    local ping = GetPing()
+    local predictionTime = 0.25 + (ping / 100)
+    return ball.Position + (ball.AssemblyLinearVelocity * predictionTime)
+end
+
+-- Fungsi untuk memeriksa apakah bola dalam keadaan berhenti
+local function IsBallStationary(ball)
+    return ball.AssemblyLinearVelocity.Magnitude < 0.1 -- Anggap bola berhenti jika kecepatan < 0.1
+end
+
+-- Fungsi utama untuk memeriksa kondisi Auto Parry
+local function CheckAutoParry()
+    if not autoParryActive then 
+        visualizerPart.Visible = false -- Sembunyikan visualizer jika Auto Parry tidak aktif
+        return 
     end
 
-    -- Penanganan Warp
-    if data.distance_player_to_ball < 10 and data.target_Count > 0 then
-        data.is_ball_Warping = tick() - (data.last_target and (ball_Position - data.last_target.HumanoidRootPart.Position).Magnitude < 35.5 and tick() or 0) > 0.15
+    local closestBall, distanceToBall = DetectBall()
+    if closestBall then
+        local predictedPosition = PredictBallPosition(closestBall)
+
+        -- Deteksi tambahan untuk memastikan bola tidak berhenti
+        if IsBallStationary(closestBall) then
+            print("Ball is stationary, not executing parry.")
+            visualizerPart.Visible = false -- Sembunyikan visualizer jika bola berhenti
+            return
+        end
+
+        -- Perbarui posisi visualizer
+        visualizerPart.Position = predictedPosition
+        visualizerPart.Visible = showVisualizer -- Tampilkan visualizer sesuai checkbox
+
+        -- Logika untuk menentukan apakah perlu melakukan parry
+        if distanceToBall < 10 then
+            -- Implementasikan logika parry di sini, misalnya:
+            print("Parry executed at position: ", predictedPosition)
+            -- Panggil fungsi parry di sini
+        end
+    else
+        visualizerPart.Visible = false -- Sembunyikan visualizer jika tidak ada bola
     end
 end
 
--- Menggunakan RunService untuk memanggil handleParry setiap frame
-runService.RenderStepped:Connect(handleParry)
+-- Fungsi untuk menangani kesalahan yang mungkin terjadi
+local function HandleError(errorMessage)
+    OrionLib:MakeNotification({
+        Name = "Error Detected",
+        Content = errorMessage,
+        Image = nil,
+        Time = 5
+    })
+    warn(errorMessage)
+end
 
--- Menyimpan konfigurasi GUI saat ditutup
-OrionLib:Init()
+-- Menambahkan tombol Toggle Auto Parry pada tab
+Tab:AddButton({
+    Name = "Toggle Auto Parry",
+    Callback = function()
+        ToggleAutoParry()
+    end
+})
+
+-- Menambahkan checkbox untuk menampilkan visualizer
+Tab:AddToggle({
+    Name = "Show Visualizer",
+    Default = false,
+    Callback = function(value)
+        showVisualizer = value
+        visualizerPart.Visible = value -- Set visibilitas sesuai dengan checkbox
+    end
+})
+
+-- Menjalankan fungsi Auto Parry dalam loop
+runService.RenderStepped:Connect(function()
+    pcall(CheckAutoParry) -- Menggunakan pcall untuk menangani kesalahan tanpa menghentikan skrip
+end)
+
+print("Script ran without errors")
