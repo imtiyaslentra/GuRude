@@ -38,13 +38,6 @@ local runService = game:GetService("RunService")
 local vim = game:GetService("VirtualInputManager")
 
 local ballFolder = workspace.Balls
-local indicatorPart = Instance.new("Part")
-indicatorPart.Size = Vector3.new(5, 5, 5)
-indicatorPart.Anchored = true
-indicatorPart.CanCollide = false
-indicatorPart.Transparency = 1
-indicatorPart.BrickColor = BrickColor.new("Bright red")
-indicatorPart.Parent = workspace
 
 local visualizerPart = Instance.new("Part") -- Part untuk visualizer
 visualizerPart.Size = Vector3.new(1, 1, 1)
@@ -54,35 +47,8 @@ visualizerPart.BrickColor = BrickColor.new("Bright yellow")
 visualizerPart.Transparency = 1 -- Mulai dengan tidak terlihat
 visualizerPart.Parent = workspace
 
-local lastBallPressed = nil
-local isKeyPressed = false
 local autoParryActive = false -- Status untuk toggle Auto Parry
 local showVisualizer = false -- Status untuk toggle visualizer
-
--- Fungsi toggle untuk Auto Parry
-local function ToggleAutoParry()
-    autoParryActive = not autoParryActive
-    if autoParryActive then
-        OrionLib:MakeNotification({
-            Name = "Auto Parry Activated",
-            Content = "Auto Parry is now active!",
-            Image = nil,
-            Time = 3
-        })
-    else
-        OrionLib:MakeNotification({
-            Name = "Auto Parry Deactivated",
-            Content = "Auto Parry has been turned off.",
-            Image = nil,
-            Time = 3
-        })
-    end
-end
-
--- Fungsi untuk mendeteksi ping
-local function GetPing()
-    return game:GetService("Stats").Network.ServerStatsItem["Data Ping"]:GetValue() / 10
-end
 
 -- Fungsi untuk mendeteksi posisi dan kecepatan bola
 local function DetectBall()
@@ -102,18 +68,6 @@ local function DetectBall()
     return closestBall, closestDistance
 end
 
--- Fungsi untuk memprediksi posisi bola
-local function PredictBallPosition(ball)
-    local ping = GetPing()
-    local predictionTime = 0.25 + (ping / 100)
-    return ball.Position + (ball.AssemblyLinearVelocity * predictionTime)
-end
-
--- Fungsi untuk memeriksa apakah bola dalam keadaan berhenti
-local function IsBallStationary(ball)
-    return ball.AssemblyLinearVelocity.Magnitude < 0.1 -- Anggap bola berhenti jika kecepatan < 0.1
-end
-
 -- Fungsi utama untuk memeriksa kondisi Auto Parry
 local function CheckAutoParry()
     if not autoParryActive then 
@@ -123,23 +77,13 @@ local function CheckAutoParry()
 
     local closestBall, distanceToBall = DetectBall()
     if closestBall then
-        local predictedPosition = PredictBallPosition(closestBall)
-
-        -- Deteksi tambahan untuk memastikan bola tidak berhenti
-        if IsBallStationary(closestBall) then
-            print("Ball is stationary, not executing parry.")
-            visualizerPart.Transparency = 1 -- Sembunyikan visualizer jika bola berhenti
-            return
-        end
-
-        -- Perbarui posisi visualizer
-        visualizerPart.Position = predictedPosition
+        visualizerPart.Position = closestBall.Position -- Memperbarui posisi visualizer
         visualizerPart.Transparency = showVisualizer and 0.5 or 1 -- Tampilkan visualizer sesuai checkbox
 
         -- Logika untuk menentukan apakah perlu melakukan parry
         if distanceToBall < 10 then
             -- Implementasikan logika parry di sini, misalnya:
-            print("Parry executed at position: ", predictedPosition)
+            print("Parry executed at position: ", visualizerPart.Position)
             -- Panggil fungsi parry di sini
         end
     else
@@ -147,11 +91,18 @@ local function CheckAutoParry()
     end
 end
 
--- Menambahkan tombol Toggle Auto Parry pada tab
+-- Tombol Toggle Auto Parry pada tab
 Tab:AddButton({
     Name = "Toggle Auto Parry",
     Callback = function()
-        ToggleAutoParry()
+        autoParryActive = not autoParryActive
+        local status = autoParryActive and "activated" or "deactivated"
+        OrionLib:MakeNotification({
+            Name = "Auto Parry " .. status,
+            Content = "Auto Parry is now " .. status .. "!",
+            Image = nil,
+            Time = 3
+        })
     end
 })
 
